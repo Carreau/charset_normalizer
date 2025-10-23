@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 from glob import glob
 from math import ceil
 from os.path import isdir
@@ -36,6 +37,16 @@ def performance_compare(arguments):
         help="Apply artificial size increase to challenge the detection mechanism further",
     )
 
+    parser.add_argument(
+        "-e",
+        "--export",
+        action="store",
+        default=None,
+        type=str,
+        dest="export_filename",
+        help="Specify a file to export the performance results to.",
+    )
+
     args = parser.parse_args(arguments)
 
     if not isdir("./char-dataset"):
@@ -46,11 +57,13 @@ def performance_compare(arguments):
 
     chardet_results = []
     charset_normalizer_results = []
+    paths = []
 
     file_list = sorted(glob("./char-dataset/**/*.*"))
     total_files = len(file_list)
 
     for idx, tbt_path in enumerate(file_list):
+        paths.append(tbt_path)
         with open(tbt_path, "rb") as fp:
             content = fp.read() * args.size_coeff
 
@@ -70,6 +83,17 @@ def performance_compare(arguments):
             f"{idx + 1:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
             f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
         )
+
+    if args.export_filename:
+        print(f"\nExporting performance results to {args.export_filename}...")
+        with open(f"{args.export_filename}.csv", "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["path", "chardet_time", "charset_normalizer_time"])
+            for path, chardet_time, charset_normalizer_time in zip(
+                paths, chardet_results, charset_normalizer_results
+            ):
+                writer.writerow([path, chardet_time, charset_normalizer_time])
+        print("Export complete.")
 
     # Print the top 10 rows with the slowest execution time
     print(
