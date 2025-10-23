@@ -95,6 +95,11 @@ def performance_compare(arguments):
                 writer.writerow([path, chardet_time, charset_normalizer_time])
         print("Export complete.")
 
+    return analyse(file_list, charset_normalizer_results, chardet_results)
+
+
+def analyse(file_list, charset_normalizer_results, chardet_results):
+    total_files = len(file_list)
     # Print the top 10 rows with the slowest execution time
     print(
         f"\n{'-' * 102}\nTop 10 rows with the slowest execution time of charset_normalizer:\n"
