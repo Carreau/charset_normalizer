@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from glob import glob
 from math import ceil
 from os.path import isdir
@@ -20,6 +21,31 @@ def calc_percentile(data, percentile):
     sorted_data = sorted(data)
 
     return sorted_data[int(p)] if p.is_integer() else sorted_data[int(ceil(p)) - 1]
+
+
+def process_file(tbt_path, size_coeff):
+    """
+    Process a single file and return timing results for both chardet and charset_normalizer.
+
+    Args:
+        tbt_path: Path to the file to process
+        size_coeff: Size multiplier for testing with larger content
+
+    Returns:
+        tuple: (path, chardet_time, charset_normalizer_time)
+    """
+    with open(tbt_path, "rb") as fp:
+        content = fp.read() * size_coeff
+
+    before = perf_counter_ns()
+    chardet_detect(content)
+    chardet_time = round((perf_counter_ns() - before) / 1000000000, 5)
+
+    before = perf_counter_ns()
+    detect(content)
+    charset_normalizer_time = round((perf_counter_ns() - before) / 1000000000, 5)
+
+    return tbt_path, chardet_time, charset_normalizer_time
 
 
 def performance_compare(arguments):
@@ -47,12 +73,26 @@ def performance_compare(arguments):
         help="Specify a file to export the performance results to.",
     )
 
+    parser.add_argument(
+        "-n",
+        "--threads",
+        action="store",
+        default=1,
+        type=int,
+        dest="num_threads",
+        help="Number of threads to use for parallel processing (default: 1 for sequential)",
+    )
+
     args = parser.parse_args(arguments)
 
     if not isdir("./char-dataset"):
         print(
             "This script require https://github.com/Ousret/char-dataset to be cloned on package root directory"
         )
+        exit(1)
+
+    if args.num_threads < 1:
+        print("Number of threads must be at least 1")
         exit(1)
 
     chardet_results = []
@@ -62,27 +102,54 @@ def performance_compare(arguments):
     file_list = sorted(glob("./char-dataset/**/*.*"))
     total_files = len(file_list)
 
-    for idx, tbt_path in enumerate(file_list):
-        paths.append(tbt_path)
-        with open(tbt_path, "rb") as fp:
-            content = fp.read() * args.size_coeff
+    print(f"Processing {total_files} files using {args.num_threads} thread(s)...")
 
-        before = perf_counter_ns()
-        chardet_detect(content)
-        chardet_time = round((perf_counter_ns() - before) / 1000000000, 5)
-        chardet_results.append(chardet_time)
+    start_time = perf_counter_ns()
 
-        before = perf_counter_ns()
-        detect(content)
-        charset_normalizer_time = round((perf_counter_ns() - before) / 1000000000, 5)
-        charset_normalizer_results.append(charset_normalizer_time)
+    if args.num_threads == 1:
+        # Sequential processing (original behavior)
+        for idx, tbt_path in enumerate(file_list):
+            tbt_path, chardet_time, charset_normalizer_time = process_file(
+                tbt_path, args.size_coeff
+            )
+            paths.append(tbt_path)
+            chardet_results.append(chardet_time)
+            charset_normalizer_results.append(charset_normalizer_time)
 
-        charset_normalizer_time = charset_normalizer_time or 0.000005
-        cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
-        print(
-            f"{idx + 1:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
-            f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
-        )
+            charset_normalizer_time = charset_normalizer_time or 0.000005
+            cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
+            print(
+                f"{idx + 1:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
+                f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
+            )
+    else:
+        # Multithreaded processing
+        completed = 0
+        with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
+            # Submit all files to the thread pool
+            future_to_path = {
+                executor.submit(process_file, tbt_path, args.size_coeff): tbt_path
+                for tbt_path in file_list
+            }
+
+            # Process results as they complete
+            for future in as_completed(future_to_path):
+                tbt_path, chardet_time, charset_normalizer_time = future.result()
+                paths.append(tbt_path)
+                chardet_results.append(chardet_time)
+                charset_normalizer_results.append(charset_normalizer_time)
+
+                completed += 1
+                charset_normalizer_time = charset_normalizer_time or 0.000005
+                cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
+                print(
+                    f"{completed:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
+                    f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
+                )
+
+    end_time = perf_counter_ns()
+    total_elapsed_time = round((end_time - start_time) / 1000000000, 2)
+    print(f"\nTotal time elapsed: {total_elapsed_time} seconds")
 
     if args.export_filename:
         print(f"\nExporting performance results to {args.export_filename}...")
@@ -95,10 +162,10 @@ def performance_compare(arguments):
                 writer.writerow([path, chardet_time, charset_normalizer_time])
         print("Export complete.")
 
-    return analyse(file_list, charset_normalizer_results, chardet_results)
+    return analyse(file_list, charset_normalizer_results, chardet_results, args.num_threads)
 
 
-def analyse(file_list, charset_normalizer_results, chardet_results):
+def analyse(file_list, charset_normalizer_results, chardet_results, num_threads=1):
     total_files = len(file_list)
     # Print the top 10 rows with the slowest execution time
     print(
@@ -117,7 +184,7 @@ def analyse(file_list, charset_normalizer_results, chardet_results):
     stdev_time = stdev(charset_normalizer_results)
     mean_time = mean(charset_normalizer_results)
     cv = (stdev_time / mean_time) * 100  # Coefficient of variation
-    print(f"\n{'-' * 102}\nCharset Normalizer statistics:\n")
+    print(f"\n{'-' * 102}\nCharset Normalizer statistics (using {num_threads} thread(s)):\n")
     print(f"Minimum Execution Time: {min_time:.5f} seconds")
     print(f"Maximum Execution Time: {max_time:.5f} seconds")
     print(f"Mean Execution Time: {mean_time:.5f} seconds")
