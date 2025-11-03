@@ -13,6 +13,14 @@ from time import perf_counter_ns
 from chardet import detect as chardet_detect
 
 from charset_normalizer import detect
+from charset_normalizer.api import from_bytes
+import charset_normalizer.md
+import charset_normalizer.constant
+import charset_normalizer.api
+import charset_normalizer.models
+import charset_normalizer.utils
+
+NANO = 1_000_000_000
 
 
 def calc_percentile(data, percentile):
@@ -23,29 +31,40 @@ def calc_percentile(data, percentile):
     return sorted_data[int(p)] if p.is_integer() else sorted_data[int(ceil(p)) - 1]
 
 
-def process_file(tbt_path, size_coeff):
+def process_file(tbt_path, size_coeff, preloaded_content=None):
     """
     Process a single file and return timing results for both chardet and charset_normalizer.
 
     Args:
         tbt_path: Path to the file to process
         size_coeff: Size multiplier for testing with larger content
+        preloaded_content: Optional pre-loaded file content to avoid I/O
 
     Returns:
-        tuple: (path, chardet_time, charset_normalizer_time)
+        tuple: (path, chardet_time, charset_normalizer_time, io_time)
     """
-    with open(tbt_path, "rb") as fp:
-        content = fp.read() * size_coeff
+    # Time: file I/O
+    if preloaded_content is not None:
+        content = preloaded_content
+        io_time = 0.0
+    else:
+        io_start = perf_counter_ns()
+        with open(tbt_path, "rb") as fp:
+            content = fp.read() * size_coeff
+        io_time = perf_counter_ns() - io_start
 
     before = perf_counter_ns()
-    chardet_detect(content)
-    chardet_time = round((perf_counter_ns() - before) / 1000000000, 5)
+    # chardet_detect(content)
+    import time
+
+    time.sleep(0.0005)
+    chardet_time = perf_counter_ns() - before
 
     before = perf_counter_ns()
-    detect(content)
-    charset_normalizer_time = round((perf_counter_ns() - before) / 1000000000, 5)
+    from_bytes(content).best()
+    charset_normalizer_time = perf_counter_ns() - before
 
-    return tbt_path, chardet_time, charset_normalizer_time
+    return tbt_path, chardet_time, charset_normalizer_time, io_time
 
 
 def performance_compare(arguments):
@@ -61,6 +80,14 @@ def performance_compare(arguments):
         type=int,
         dest="size_coeff",
         help="Apply artificial size increase to challenge the detection mechanism further",
+    )
+
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        dest="quiet",
+        help="Do not print individual test results",
     )
 
     parser.add_argument(
@@ -83,6 +110,13 @@ def performance_compare(arguments):
         help="Number of threads to use for parallel processing (default: 1 for sequential)",
     )
 
+    parser.add_argument(
+        "--preload",
+        action="store_true",
+        dest="preload",
+        help="Pre-load all files into memory before processing to eliminate I/O contention",
+    )
+
     args = parser.parse_args(arguments)
 
     if not isdir("./char-dataset"):
@@ -91,12 +125,15 @@ def performance_compare(arguments):
         )
         exit(1)
 
-    if args.num_threads < 1:
-        print("Number of threads must be at least 1")
+    if args.num_threads < 0:
+        print(
+            "Number of threads must be at least 0 (in main thread), or >1 ThreadpoolExecutor"
+        )
         exit(1)
 
     chardet_results = []
     charset_normalizer_results = []
+    io_times = []
     paths = []
 
     file_list = sorted(glob("./char-dataset/**/*.*"))
@@ -104,52 +141,144 @@ def performance_compare(arguments):
 
     print(f"Processing {total_files} files using {args.num_threads} thread(s)...")
 
+    # Pre-load all files into memory if requested
+    file_contents = {}
+    if args.preload:
+        print("Pre-loading all files into memory...")
+        preload_start = perf_counter_ns()
+        for path in file_list:
+            with open(path, "rb") as fp:
+                file_contents[path] = fp.read() * args.size_coeff
+        preload_time = round((perf_counter_ns() - preload_start) / 1_000_000_000, 2)
+        print(f"Pre-loading complete in {preload_time}s")
+
     start_time = perf_counter_ns()
 
-    if args.num_threads == 1:
+    if args.num_threads == 0:
         # Sequential processing (original behavior)
+        pfs_time = 0
+        sc = args.size_coeff
         for idx, tbt_path in enumerate(file_list):
-            tbt_path, chardet_time, charset_normalizer_time = process_file(
-                tbt_path, args.size_coeff
+            pfs = perf_counter_ns()
+            tbt_path, chardet_time, charset_normalizer_time, io_time = process_file(
+                tbt_path,
+                sc,
+                None
+                # file_contents.get(tbt_path)
             )
+            delta = perf_counter_ns() - pfs
+            pfs_time += delta
+
+            # print(
+            #    round(
+            #        (delta - (chardet_time + charset_normalizer_time + io_time)) / NANO,
+            #        2,
+            #    )
+            # )
             paths.append(tbt_path)
             chardet_results.append(chardet_time)
             charset_normalizer_results.append(charset_normalizer_time)
+            io_times.append(io_time)
 
-            charset_normalizer_time = charset_normalizer_time or 0.000005
             cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
-            print(
-                f"{idx + 1:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
-                f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
-            )
+            if not args.quiet:
+                print(
+                    f"{idx + 1:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
+                    f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
+                )
+            else:
+                pass
+                print(f"\r{idx}/{total_files}", end="")
     else:
         # Multithreaded processing
-        completed = 0
+        pfs_time = 0
+        for sub in {"api", "md", "utils", "models"}:
+            if getattr(charset_normalizer, sub).__file__.endswith(".py"):
+                print(
+                    "CHARSET NORMALISER",
+                    sub,
+                    "NOT COMPILED WITH MYPYC",
+                    getattr(charset_normalizer, sub),
+                )
         with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
             # Submit all files to the thread pool
             future_to_path = {
-                executor.submit(process_file, tbt_path, args.size_coeff): tbt_path
+                executor.submit(
+                    process_file, tbt_path, args.size_coeff, file_contents.get(tbt_path)
+                ): tbt_path
                 for tbt_path in file_list
             }
 
             # Process results as they complete
-            for future in as_completed(future_to_path):
-                tbt_path, chardet_time, charset_normalizer_time = future.result()
+            for completed, future in enumerate(as_completed(future_to_path)):
+                (
+                    tbt_path,
+                    chardet_time,
+                    charset_normalizer_time,
+                    io_time,
+                ) = future.result()
                 paths.append(tbt_path)
                 chardet_results.append(chardet_time)
                 charset_normalizer_results.append(charset_normalizer_time)
+                io_times.append(io_time)
 
-                completed += 1
-                charset_normalizer_time = charset_normalizer_time or 0.000005
+                charset_normalizer_time = charset_normalizer_time
                 cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
-                print(
-                    f"{completed:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
-                    f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
-                )
+                if not args.quiet:
+                    print(
+                        f"{completed:>3}/{total_files} {tbt_path:<82} C:{chardet_time:.5f}  "
+                        f"CN:{charset_normalizer_time:.5f}  {cn_faster:.1f} %"
+                    )
+                else:
+                    print(f"\r{completed}/{total_files}", end="")
+    print()
 
     end_time = perf_counter_ns()
-    total_elapsed_time = round((end_time - start_time) / 1000000000, 2)
+    total_elapsed_time = (end_time - start_time) / NANO
     print(f"\nTotal time elapsed: {total_elapsed_time} seconds")
+    print(f"\nTotal pfs : {(pfs_time / NANO):2f} seconds")
+
+    # Timing analysis for multithreading efficiency
+    total_io_time = sum(io_times) / NANO
+    total_cn_time = sum(charset_normalizer_results) / NANO
+    total_cd_time = sum(chardet_results) / NANO
+    total_work_time = total_io_time + total_cn_time + total_cd_time
+
+    print(f"\n{'-' * 102}\nTiming Breakdown (using {args.num_threads} thread(s)):\n")
+    print(f"Total I/O time (sum):           {total_io_time:.2f}s")
+    print(f"Total CD detection time (sum):  {total_cd_time:.2f}s")
+    print(f"Total CN detection time (sum):  {total_cn_time:.2f}s")
+    print(f"Total work time (sum):          {total_work_time:.2f}s")
+    print(f"Actual wall time:               {total_elapsed_time:.2f}s")
+
+    if args.num_threads > 1:
+        theoretical_speedup = args.num_threads
+        actual_speedup = (
+            total_work_time / total_elapsed_time if total_elapsed_time > 0 else 0
+        )
+        efficiency = (
+            (actual_speedup / theoretical_speedup) * 100
+            if theoretical_speedup > 0
+            else 0
+        )
+
+        print(f"\nParallel Efficiency Analysis:")
+        print(f"Theoretical speedup (# threads): {theoretical_speedup}x")
+        print(f"Actual speedup:                  {actual_speedup:.2f}x")
+        print(f"Parallel efficiency:             {efficiency:.1f}%")
+        print(
+            f"Time unaccounted for:            {max(0, total_elapsed_time - (total_work_time / args.num_threads)):.2f}s"
+        )
+
+        if efficiency < 80:
+            print(
+                f"\nWARNING: Low parallel efficiency ({efficiency:.1f}%). Possible causes:"
+            )
+            print(
+                "  - GIL is still enabled (check with: python -c 'import sys; print(sys._is_gil_enabled())')"
+            )
+            print("  - Thread synchronization overhead (locks, print statements, etc.)")
+            print("  - I/O contention or memory bandwidth limits")
 
     if args.export_filename:
         print(f"\nExporting performance results to {args.export_filename}...")

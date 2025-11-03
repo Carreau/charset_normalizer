@@ -18,7 +18,12 @@ except ImportError:
 if USE_MYPYC and mypycify is not None:
     MYPYC_MODULES = mypycify(
         [
+            "src/charset_normalizer/api.py",
+            "src/charset_normalizer/cd.py",
+            "src/charset_normalizer/constant.py",
             "src/charset_normalizer/md.py",
+            "src/charset_normalizer/models.py",
+            "src/charset_normalizer/utils.py",
         ],
         debug_level="0",
         opt_level="3",
