@@ -8,6 +8,10 @@ from encodings.aliases import aliases
 from functools import lru_cache
 from re import findall
 from typing import Generator
+from unicodedata import (
+    name as unicodedata_name,
+    decomposition as unicodedata_decomposition,
+)
 
 from _multibytecodec import (  # type: ignore[import-not-found,import]
     MultibyteIncrementalDecoder,
@@ -27,7 +31,7 @@ from .constant import (
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_accentuated(character: str) -> bool:
     try:
-        description: str = unicodedata.name(character)
+        description: str = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
     return (
@@ -44,7 +48,7 @@ def is_accentuated(character: str) -> bool:
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def remove_accent(character: str) -> str:
-    decomposed: str = unicodedata.decomposition(character)
+    decomposed: str = unicodedata_decomposition(character)
     if not decomposed:
         return character
 
@@ -70,7 +74,7 @@ def unicode_range(character: str) -> str | None:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_latin(character: str) -> bool:
     try:
-        description: str = unicodedata.name(character)
+        description: str = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
     return "LATIN" in description
@@ -134,7 +138,7 @@ def is_case_variable(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_cjk(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
@@ -144,7 +148,7 @@ def is_cjk(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_hiragana(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
@@ -154,7 +158,7 @@ def is_hiragana(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_katakana(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
@@ -164,7 +168,7 @@ def is_katakana(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_hangul(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
@@ -174,7 +178,7 @@ def is_hangul(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_thai(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
@@ -184,7 +188,7 @@ def is_thai(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_arabic(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
@@ -194,7 +198,7 @@ def is_arabic(character: str) -> bool:
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_arabic_isolated_form(character: str) -> bool:
     try:
-        character_name = unicodedata.name(character)
+        character_name = unicodedata_name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
