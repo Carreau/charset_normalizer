@@ -579,6 +579,10 @@ def is_suspiciously_successive_range(
     return True
 
 
+import threading
+
+thread_local = threading.local()
+
 @lru_cache(maxsize=2048)
 def mess_ratio(
     decoded_sequence: str, maximum_threshold: float = 0.2, debug: bool = False
@@ -587,9 +591,14 @@ def mess_ratio(
     Compute a mess ratio given a decoded bytes sequence. The maximum threshold does stop the computation earlier.
     """
 
-    detectors: list[MessDetectorPlugin] = [
-        md_class() for md_class in MessDetectorPlugin.__subclasses__()
-    ]
+    detectors: list[MessDetectorPlugin]
+
+    if getattr(thread_local, "detectors", None) is None:
+        detectors = thread_local.detectors = [
+            md_class() for md_class in MessDetectorPlugin.__subclasses__()
+        ]
+    else:
+        detectors = thread_local.detectors
 
     length: int = len(decoded_sequence) + 1
 
