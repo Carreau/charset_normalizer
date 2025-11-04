@@ -254,12 +254,11 @@ def any_specified_encoding(sequence: bytes, search_zone: int = 8192) -> str | No
     return None
 
 
-@lru_cache(maxsize=128)
 def is_multi_byte_encoding(name: str) -> bool:
     """
     Verify is a specific encoding is a multi byte one based on it IANA name
     """
-    return name in {
+    if name in {
         "utf_8",
         "utf_8_sig",
         "utf_16",
@@ -269,10 +268,30 @@ def is_multi_byte_encoding(name: str) -> bool:
         "utf_32_le",
         "utf_32_be",
         "utf_7",
-    } or issubclass(
+    }:
+        return True
+    else:
+        return _sub(name)
+
+
+import threading
+from typing import cast
+
+tl = threading.local()
+
+
+def _sub(name: str) -> bool:
+    if getattr(tl, "cache", None) is None:
+        print("init")
+        tl.cache = {}
+    if name in tl.cache:
+        return cast(bool, tl.cache[name])
+    res = issubclass(
         importlib.import_module(f"encodings.{name}").IncrementalDecoder,
         MultibyteIncrementalDecoder,
     )
+    tl.cache[name] = res
+    return res
 
 
 def identify_sig_or_bom(sequence: bytes) -> tuple[str | None, bytes]:
