@@ -5,7 +5,21 @@ import logging
 import unicodedata
 from codecs import IncrementalDecoder
 from encodings.aliases import aliases
-from functools import lru_cache
+
+from functools import lru_cache as lru_cache
+
+from typing import TypeVar, Any, Callable
+
+T = TypeVar("T")
+
+
+def _lru_cache(*args: Any, **kwargs: Any) -> Callable[[T], T]:
+    def f(x: T) -> T:
+        return x
+
+    return f
+
+
 from re import findall
 from typing import Generator
 
@@ -42,8 +56,12 @@ def is_accentuated(character: str) -> bool:
     )
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def remove_accent(character: str) -> str:
+    return _remove_accent(character)
+
+
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def _remove_accent(character: str) -> str:
     decomposed: str = unicodedata.decomposition(character)
     if not decomposed:
         return character
@@ -53,8 +71,12 @@ def remove_accent(character: str) -> str:
     return chr(int(codes[0], 16))
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def unicode_range(character: str) -> str | None:
+    return _unicode_range(character)
+
+
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def _unicode_range(character: str) -> str | None:
     """
     Retrieve the Unicode range official name from a single character.
     """
@@ -76,9 +98,17 @@ def is_latin(character: str) -> bool:
     return "LATIN" in description
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_punctuation(character: str) -> bool:
-    character_category: str = unicodedata.category(character)
+    return _is_punctuation(character)
+
+
+def uca(character: str) -> str:
+    return unicodedata.category(character)
+
+
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def _is_punctuation(character: str) -> bool:
+    character_category: str = uca(character)
 
     if "P" in character_category:
         return True

@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from functools import lru_cache
+# from functools import lru_cache
+
+from typing import TypeVar, Any, Callable
+
+T = TypeVar("T")
+
+
+def lru_cache(*args: Any, **kwargs: Any) -> Callable[[T], T]:
+    def f(x: T) -> T:
+        return x
+
+    return f
+
+
 from logging import getLogger
 
 from .constant import (
@@ -505,8 +518,14 @@ class ArabicIsolatedFormPlugin(MessDetectorPlugin):
         return isolated_form_usage
 
 
-@lru_cache(maxsize=1024)
 def is_suspiciously_successive_range(
+    unicode_range_a: str | None, unicode_range_b: str | None
+) -> bool:
+    return _is_suspiciously_successive_range(unicode_range_a, unicode_range_b)
+
+
+@lru_cache(maxsize=1024)
+def _is_suspiciously_successive_range(
     unicode_range_a: str | None, unicode_range_b: str | None
 ) -> bool:
     """
