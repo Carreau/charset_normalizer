@@ -38,7 +38,18 @@ from .constant import (
     COMMON_CJK_CHARACTERS,
 )
 
-    
+#@thread_lru(*kwargs):
+#    class LRU(threading.local):
+#
+#        def __init__(self, func):
+#            self.func  = lru_cache(**kwargs)(func)
+#
+#        def __call__(self, *args, **kwargs):
+#            return self.func(*args, **kwargs)
+#
+#    def inner(fun):
+#        return LRU(fun)
+#    return inner
 
 def _is_accentuated(character: str) -> bool:
     try:
@@ -118,8 +129,7 @@ def _is_punctuation(character: str) -> bool:
 is_punctuation = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_punctuation)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_symbol(character: str) -> bool:
+def _is_symbol(character: str) -> bool:
     character_category: str = unicodedata.category(character)
 
     if "S" in character_category or "N" in character_category:
@@ -131,6 +141,8 @@ def is_symbol(character: str) -> bool:
         return False
 
     return "Forms" in character_range and character_category != "Lo"
+
+is_symbol= lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_symbol)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -153,10 +165,10 @@ def is_separator(character: str) -> bool:
     return "Z" in character_category or character_category in {"Po", "Pd", "Pc"}
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_case_variable(character: str) -> bool:
+def _is_case_variable(character: str) -> bool:
     return character.islower() != character.isupper()
 
+is_case_variable = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_case_variable)
 
 def _is_cjk(character: str) -> bool:
     try:
@@ -210,14 +222,16 @@ def _is_thai(character: str) -> bool:
 is_thai = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_thai)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_arabic(character: str) -> bool:
+def _is_arabic(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
     return "ARABIC" in character_name
+
+
+is_arabic = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_arabic)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -460,8 +474,6 @@ class LocalProxy(threading.local):
 
 per_thread = LocalProxy('loc1',is_accentuated=_is_accentuated, remove_accent=_remove_accent, is_punctuation=_is_punctuation,
                         is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
-                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range, is_unprintable=_is_unprintable) #type:ignore
-
-per_thread2 = LocalProxy('loc2',is_accentuated=_is_accentuated, remove_accent=_remove_accent, is_punctuation=_is_punctuation,
-                        is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
-                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range, is_unprintable=_is_unprintable) #type:ignore
+                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range,
+                        is_unprintable=_is_unprintable, is_symbol=_is_symbol, is_arabic=_is_arabic,
+                        is_case_variable=_is_case_variable) #type:ignore

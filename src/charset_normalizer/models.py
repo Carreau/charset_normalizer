@@ -11,6 +11,8 @@ from .utils import iana_name, is_multi_byte_encoding, unicode_range
 
 
 class CharsetMatch:
+
+
     def __init__(
         self,
         payload: bytes,
@@ -21,6 +23,9 @@ class CharsetMatch:
         decoded_payload: str | None = None,
         preemptive_declaration: str | None = None,
     ):
+        self._co = ''
+        self._cf = ''
+
         self._payload: bytes = payload
 
         self._encoding: str = guessed_encoding
@@ -233,13 +238,18 @@ class CharsetMatch:
             self._output_payload = decoded_string.encode(encoding, "replace")
 
         return self._output_payload  # type: ignore
-
     @property
     def fingerprint(self) -> str:
         """
         Retrieve the unique SHA256 computed using the transformed (re-encoded) payload. Not the original one.
         """
-        return sha256(self.output()).hexdigest()
+        out = self.output()
+        if out == self._co:
+            return self._cf
+        else:
+            self._cf =  sha256(out).hexdigest()
+            self._co = out
+        return self._cf
 
 
 class CharsetMatches:
@@ -288,7 +298,7 @@ class CharsetMatches:
         # We should disable the submatch factoring when the input file is too heavy (conserve RAM usage)
         if len(item.raw) < TOO_BIG_SEQUENCE:
             for match in self._results:
-                if match.fingerprint == item.fingerprint and match.chaos == item.chaos:
+                if match.chaos == item.chaos and match.fingerprint == item.fingerprint :
                     match.add_submatch(item)
                     return
         self._results.append(item)
