@@ -5,6 +5,7 @@ import logging
 import unicodedata
 from codecs import IncrementalDecoder
 from encodings.aliases import aliases
+import threading
 
 from functools import lru_cache as lru_cache
 
@@ -37,9 +38,9 @@ from .constant import (
     COMMON_CJK_CHARACTERS,
 )
 
+    
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_accentuated(character: str) -> bool:
+def _is_accentuated(character: str) -> bool:
     try:
         description: str = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -54,13 +55,10 @@ def is_accentuated(character: str) -> bool:
         or "WITH MACRON" in description
         or "WITH RING ABOVE" in description
     )
+is_accentuated = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_accentuated)
 
 
-def remove_accent(character: str) -> str:
-    return _remove_accent(character)
 
-
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def _remove_accent(character: str) -> str:
     decomposed: str = unicodedata.decomposition(character)
     if not decomposed:
@@ -70,12 +68,10 @@ def _remove_accent(character: str) -> str:
 
     return chr(int(codes[0], 16))
 
-
-def unicode_range(character: str) -> str | None:
-    return _unicode_range(character)
+remove_accent = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_remove_accent)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+
 def _unicode_range(character: str) -> str | None:
     """
     Retrieve the Unicode range official name from a single character.
@@ -88,18 +84,17 @@ def _unicode_range(character: str) -> str | None:
 
     return None
 
+unicode_range = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_unicode_range)
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_latin(character: str) -> bool:
+
+def _is_latin(character: str) -> bool:
     try:
         description: str = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
     return "LATIN" in description
 
-
-def is_punctuation(character: str) -> bool:
-    return _is_punctuation(character)
+is_latin = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_latin)
 
 
 def uca(character: str) -> str:
@@ -119,6 +114,8 @@ def _is_punctuation(character: str) -> bool:
         return False
 
     return "Punctuation" in character_range
+
+is_punctuation = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_punctuation)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -161,8 +158,7 @@ def is_case_variable(character: str) -> bool:
     return character.islower() != character.isupper()
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_cjk(character: str) -> bool:
+def _is_cjk(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -170,9 +166,9 @@ def is_cjk(character: str) -> bool:
 
     return "CJK" in character_name
 
+is_cjk = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_cjk)
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_hiragana(character: str) -> bool:
+def _is_hiragana(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -180,19 +176,19 @@ def is_hiragana(character: str) -> bool:
 
     return "HIRAGANA" in character_name
 
+is_hiragana = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_hiragana)
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_katakana(character: str) -> bool:
+def _is_katakana(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
     return "KATAKANA" in character_name
+is_katakana = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_katakana)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_hangul(character: str) -> bool:
+def _is_hangul(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -201,14 +197,17 @@ def is_hangul(character: str) -> bool:
     return "HANGUL" in character_name
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_thai(character: str) -> bool:
+is_hangul = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_hangul)
+
+def _is_thai(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
     return "THAI" in character_name
+
+is_thai = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_thai)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -241,8 +240,7 @@ def is_unicode_range_secondary(range_name: str) -> bool:
     return any(keyword in range_name for keyword in UNICODE_SECONDARY_RANGE_KEYWORD)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def is_unprintable(character: str) -> bool:
+def _is_unprintable(character: str) -> bool:
     return (
         character.isspace() is False  # includes \n \t \r \v
         and character.isprintable() is False
@@ -250,6 +248,8 @@ def is_unprintable(character: str) -> bool:
         and character != "\ufeff"  # bug discovered in Python,
         # Zero Width No-Break Space located in 	Arabic Presentation Forms-B, Unicode 1.1 not acknowledged as space.
     )
+
+is_unprintable = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_unprintable)
 
 
 def any_specified_encoding(sequence: bytes, search_zone: int = 8192) -> str | None:
@@ -442,3 +442,26 @@ def cut_sequence_chunks(
                             break
 
             yield chunk
+
+class LocalProxy(threading.local):
+
+
+    def __init__(self, name, /, **kwargs:dict[str, Any]) -> None: # type: ignore
+        print('Init new', name)
+
+        self.__dict__.update({
+            k:
+            lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(v)  #type:ignore
+
+            for k,v in kwargs.items()
+        }) # type: ignore
+
+
+
+per_thread = LocalProxy('loc1',is_accentuated=_is_accentuated, remove_accent=_remove_accent, is_punctuation=_is_punctuation,
+                        is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
+                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range, is_unprintable=_is_unprintable) #type:ignore
+
+per_thread2 = LocalProxy('loc2',is_accentuated=_is_accentuated, remove_accent=_remove_accent, is_punctuation=_is_punctuation,
+                        is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
+                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range, is_unprintable=_is_unprintable) #type:ignore
