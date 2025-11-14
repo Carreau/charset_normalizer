@@ -39,11 +39,9 @@ def threaded_lru(**kwargs):
         loc = threading.local()
 
         def threaded_inner(*args, **kwargs) -> bool:
-            if 'cached_func' not in loc.__dict__.keys():
+            if (cached_func:= loc.__dict__.get('cached_func')) is None:
                 cached_func = lru_cache(**kwargs)(func)
                 loc.cached_func = cached_func
-            else:
-                cached_func = loc.cached_func
 
             return cached_func(*args, **kwargs)
         return threaded_inner
