@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from logging import getLogger
 
 from .constant import (
@@ -27,6 +26,7 @@ from .utils import (
     remove_accent,
     unicode_range,
     is_cjk_uncommon,
+    lru_cache
 )
 
 
