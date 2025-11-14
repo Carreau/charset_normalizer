@@ -31,23 +31,28 @@ from .constant import (
 
 UNICODE_RANGES_COMBINED_TUPLES = tuple([(k,v) for k,v in UNICODE_RANGES_COMBINED.items()])
 
+import sysconfig
 
-def lru_cache(**kwargs:Any) -> Callable[[T],T]:
-    def threaded_maker(func:Any) -> Any: 
+is_freethreaded = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
 
-        loc = threading.local()
+if is_freethreaded:
 
-        def threaded_inner(*args:Any, **kwargs:Any)->Any:
-            if (cached_func:= loc.__dict__.get('cached_func')) is None:
-                cached_func = _lru_cache(**kwargs)(func)
-                loc.cached_func = cached_func
+    def lru_cache(**kwargs:Any) -> Callable[[T],T]:
+        def threaded_maker(func:Any) -> Any: 
 
-            return cached_func(*args, **kwargs) # type:ignore
-        return threaded_inner
+            loc = threading.local()
 
-    return threaded_maker
+            def threaded_inner(*args:Any, **kwargs:Any)->Any:
+                if (cached_func:= loc.__dict__.get('cached_func')) is None:
+                    cached_func = _lru_cache(**kwargs)(func)
+                    loc.cached_func = cached_func
 
-#lru_cache = _lru_cache
+                return cached_func(*args, **kwargs) # type:ignore
+            return threaded_inner
+
+        return threaded_maker
+else:
+    lru_cache = _lru_cache
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)

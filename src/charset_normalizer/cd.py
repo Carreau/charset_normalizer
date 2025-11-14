@@ -21,6 +21,7 @@ from .utils import (
     is_multi_byte_encoding,
     is_unicode_range_secondary,
     unicode_range,
+    lru_cache,
 )
 
 
