@@ -5,8 +5,11 @@ import logging
 import unicodedata
 from codecs import IncrementalDecoder
 from encodings.aliases import aliases
-from functools import lru_cache
+from functools import lru_cache as _lru_cache
 import threading
+from typing import TypeVar, Any, Callable
+
+T = TypeVar('T')
 
 
 from re import findall
@@ -29,22 +32,22 @@ from .constant import (
 UNICODE_RANGES_COMBINED_TUPLES = ((k,v) for k,v in UNICODE_RANGES_COMBINED.items())
 
 
-def threaded_lru(**kwargs):
-    def threaded_maker(func):
+def lru_cache(**kwargs:Any) -> Callable[[T],T]:
+    def threaded_maker(func:Any) -> Any: 
 
         loc = threading.local()
 
-        def threaded_inner(*args, **kwargs) -> bool:
+        def threaded_inner(*args:Any, **kwargs:Any)->Any:
             if (cached_func:= loc.__dict__.get('cached_func')) is None:
-                cached_func = lru_cache(**kwargs)(func)
+                cached_func = _lru_cache(**kwargs)(func)
                 loc.cached_func = cached_func
 
-            return cached_func(*args, **kwargs)
+            return cached_func(*args, **kwargs) # type:ignore
         return threaded_inner
 
     return threaded_maker
 
-threaded_lru = lru_cache
+#lru_cache = _lru_cache
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
