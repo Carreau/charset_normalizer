@@ -210,8 +210,9 @@ def performance_compare(arguments):
     )
     print(sys.version)
     print()
+    div = max(args.num_threads, 1)
     print(f"Total CD detection time:  {total_cd_time:.2f}s")
-    print(f"Total CN detection time:  {total_cn_time:.2f}s  ({total_cn_time/args.num_threads:.2f} per thread)")
+    print(f"Total CN detection time:  {total_cn_time:.2f}s  ({total_cn_time/div:.2f} per thread)")
     print(f"Total CN Wall      time:  {charset_n_wall_time:.2f}s")
     print(f"Actual wall time       :  {total_elapsed_time:.2f}s")
 
