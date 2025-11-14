@@ -32,6 +32,8 @@ from .constant import (
     COMMON_CJK_CHARACTERS,
 )
 
+UNICODE_RANGES_COMBINED_TUPLES = ((k,v) for k,v in UNICODE_RANGES_COMBINED.items())
+
 
 def threaded_lru(**kwargs):
     def threaded_maker(func):
@@ -87,7 +89,7 @@ def unicode_range(character: str) -> str | None:
     """
     character_ord: int = ord(character)
 
-    for range_name, ord_range in UNICODE_RANGES_COMBINED.items():
+    for range_name, ord_range in UNICODE_RANGES_COMBINED_TUPLES:
         if character_ord in ord_range:
             return range_name
 
