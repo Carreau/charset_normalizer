@@ -36,7 +36,6 @@ def process_file_cd(tbt_path: str, size_coeff: int):
 
     before = perf_counter_ns()
     chardet_detect(content)
-
     chardet_time = perf_counter_ns() - before
 
     return tbt_path, chardet_time / NANO
@@ -78,6 +77,14 @@ def performance_compare(arguments):
         dest="quiet",
         help="Do not print individual test results",
     )
+
+    parser.add_argument(
+        "--no-chardet",
+        action="store_false",
+        dest="record_chardet",
+        help="Do not mesure chardet",
+    )
+
 
     parser.add_argument(
         "-e",
@@ -126,7 +133,10 @@ def performance_compare(arguments):
     charset_n_wall_time = 0
     for idx, tbt_path in enumerate(file_list):
         # Test chardet outside of ThreadPool, we don't know the python-free-threaded behavior.
-        tbt_path, chardet_time = process_file_cd(tbt_path, args.size_coeff)
+        if args.record_chardet:
+            tbt_path, chardet_time = process_file_cd(tbt_path, args.size_coeff)
+        else:
+            tb_path, chardet_time = tbt_path, 1e-5
         chardet_results[tbt_path] = chardet_time
         if args.num_threads == 0:
             charset_n_wall_time_start = perf_counter_ns()
@@ -198,8 +208,11 @@ def performance_compare(arguments):
     print(
         f"\n{'-' * 102}\nTiming Breakdown (using {args.num_threads} thread(s), GIL enabled: {sys._is_gil_enabled()}):\n"
     )
+    print(sys.version)
+    print()
+    div = max(args.num_threads, 1)
     print(f"Total CD detection time:  {total_cd_time:.2f}s")
-    print(f"Total CN detection time:  {total_cn_time:.2f}s")
+    print(f"Total CN detection time:  {total_cn_time:.2f}s  ({total_cn_time/div:.2f} per thread)")
     print(f"Total CN Wall      time:  {charset_n_wall_time:.2f}s")
     print(f"Actual wall time       :  {total_elapsed_time:.2f}s")
 
