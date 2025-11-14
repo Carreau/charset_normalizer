@@ -236,15 +236,15 @@ def performance_compare(arguments):
 def analyse(file_list, charset_normalizer_results, chardet_results, num_threads=1):
     total_files = len(file_list)
     # Print the top 10 rows with the slowest execution time
-    print(
-        f"\n{'-' * 102}\nTop 10 rows with the slowest execution time of charset_normalizer:\n"
-    )
-    sorted_results = sorted(
-        enumerate(charset_normalizer_results), key=lambda x: x[1], reverse=True
-    )
-    for idx, time in sorted_results[:10]:
-        tbt_path = file_list[idx]
-        print(f"{idx + 1:>3}/{total_files} {tbt_path:<82}  CN:{time:.5f}")
+    #print(
+    #    f"\n{'-' * 102}\nTop 10 rows with the slowest execution time of charset_normalizer:\n"
+    #)
+    #sorted_results = sorted(
+    #    enumerate(charset_normalizer_results), key=lambda x: x[1], reverse=True
+    #)
+    #for idx, time in sorted_results[:10]:
+    #    tbt_path = file_list[idx]
+    #    print(f"{idx + 1:>3}/{total_files} {tbt_path:<82}  CN:{time:.5f}")
 
     # Print charset normalizer statistics
     min_time = min(charset_normalizer_results)
