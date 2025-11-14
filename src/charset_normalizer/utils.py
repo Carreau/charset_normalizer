@@ -52,7 +52,7 @@ if is_freethreaded:
 
         return threaded_maker
 else:
-    lru_cache = _lru_cache
+    lru_cache = _lru_cache #type: ignore
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
