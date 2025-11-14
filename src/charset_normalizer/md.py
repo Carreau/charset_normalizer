@@ -27,7 +27,6 @@ from .utils import (
     remove_accent,
     unicode_range,
     is_cjk_uncommon,
-    threaded_lru,
 )
 
 
@@ -580,7 +579,7 @@ def is_suspiciously_successive_range(
     return True
 
 
-@threaded_lru(maxsize=2048)
+@lru_cache(maxsize=2048)
 def mess_ratio(
     decoded_sequence: str, maximum_threshold: float = 0.2, debug: bool = False
 ) -> float:
