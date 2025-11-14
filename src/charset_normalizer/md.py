@@ -1,19 +1,6 @@
 from __future__ import annotations
 
-# from functools import lru_cache
-
-from typing import TypeVar, Any, Callable
-
-T = TypeVar("T")
-
-
-def lru_cache(*args: Any, **kwargs: Any) -> Callable[[T], T]:
-    def f(x: T) -> T:
-        return x
-
-    return f
-
-
+from functools import lru_cache
 from logging import getLogger
 
 from .constant import (
@@ -23,15 +10,25 @@ from .constant import (
 )
 from .utils import (
     is_accentuated,
+    is_arabic,
     is_arabic_isolated_form,
     is_case_variable,
+    is_cjk,
     is_emoticon,
+    is_hangul,
+    is_hiragana,
+    is_katakana,
+    is_latin,
+    is_punctuation,
     is_separator,
+    is_symbol,
+    is_thai,
+    is_unprintable,
+    remove_accent,
+    unicode_range,
     is_cjk_uncommon,
-    per_thread,
+    threaded_lru,
 )
-
-from types import SimpleNamespace
 
 
 class MessDetectorPlugin:
@@ -76,7 +73,6 @@ class TooManySymbolOrPunctuationPlugin(MessDetectorPlugin):
 
         self._last_printable_char: str | None = None
         self._frenzy_symbol_in_word: bool = False
-        self._per_thread = SimpleNamespace({k:v for k,v in per_thread.__dict__.items()})
 
     def eligible(self, character: str) -> bool:
         return character.isprintable()
@@ -88,11 +84,11 @@ class TooManySymbolOrPunctuationPlugin(MessDetectorPlugin):
             character != self._last_printable_char
             and character not in COMMON_SAFE_ASCII_CHARACTERS
         ):
-            if self._per_thread.is_punctuation(character):
+            if is_punctuation(character):
                 self._punctuation_count += 1
             elif (
                 character.isdigit() is False
-                and self._per_thread.is_symbol(character)
+                and is_symbol(character)
                 and is_emoticon(character) is False
             ):
                 self._symbol_count += 2
@@ -152,7 +148,7 @@ class UnprintablePlugin(MessDetectorPlugin):
         return True
 
     def feed(self, character: str) -> None:
-        if per_thread.is_unprintable(character):
+        if is_unprintable(character):
             self._unprintable_count += 1
         self._character_count += 1
 
@@ -166,16 +162,16 @@ class UnprintablePlugin(MessDetectorPlugin):
 
         return (self._unprintable_count * 8) / self._character_count
 
+
 class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         self._successive_count: int = 0
         self._character_count: int = 0
 
         self._last_latin_character: str | None = None
-        self._per_thread = SimpleNamespace({k:v for k,v in per_thread.__dict__.items()})
 
     def eligible(self, character: str) -> bool:
-        return character.isalpha() and self._per_thread.is_latin(character)
+        return character.isalpha() and is_latin(character)
 
     def feed(self, character: str) -> None:
         self._character_count += 1
@@ -187,9 +183,7 @@ class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
             if character.isupper() and self._last_latin_character.isupper():
                 self._successive_count += 1
             # Worse if its the same char duplicated with different accent.
-            a = self._per_thread.remove_accent(character)
-            b = self._per_thread.remove_accent(self._last_latin_character)
-            if a == b:
+            if remove_accent(character) == remove_accent(self._last_latin_character):
                 self._successive_count += 1
         self._last_latin_character = character
 
@@ -211,7 +205,6 @@ class SuspiciousRange(MessDetectorPlugin):
         self._suspicious_successive_range_count: int = 0
         self._character_count: int = 0
         self._last_printable_seen: str | None = None
-        self._per_thread = SimpleNamespace({k:v for k,v in per_thread.__dict__.items()})
 
     def eligible(self, character: str) -> bool:
         return character.isprintable()
@@ -221,7 +214,7 @@ class SuspiciousRange(MessDetectorPlugin):
 
         if (
             character.isspace()
-            or self._per_thread.is_punctuation(character)
+            or is_punctuation(character)
             or character in COMMON_SAFE_ASCII_CHARACTERS
         ):
             self._last_printable_seen = None
@@ -231,8 +224,8 @@ class SuspiciousRange(MessDetectorPlugin):
             self._last_printable_seen = character
             return
 
-        unicode_range_a: str | None = self._per_thread.unicode_range(self._last_printable_seen)
-        unicode_range_b: str | None = self._per_thread.unicode_range(character)
+        unicode_range_a: str | None = unicode_range(self._last_printable_seen)
+        unicode_range_b: str | None = unicode_range(character)
 
         if is_suspiciously_successive_range(unicode_range_a, unicode_range_b):
             self._suspicious_successive_range_count += 1
@@ -272,8 +265,6 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
         self._buffer_accent_count: int = 0
         self._buffer_glyph_count: int = 0
 
-        self._per_thread = {k:v for k,v in per_thread.__dict__.items()}
-
     def eligible(self, character: str) -> bool:
         return True
 
@@ -284,27 +275,27 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
                 self._buffer_accent_count += 1
             if (
                 self._foreign_long_watch is False
-                and (self._per_thread['is_latin'](character) is False or is_accentuated(character))
-                and self._per_thread['is_cjk'](character) is False
-                and self._per_thread['is_hangul'](character) is False
-                and self._per_thread['is_katakana'](character) is False
-                and self._per_thread['is_hiragana'](character) is False
-                and self._per_thread['is_thai'](character) is False
+                and (is_latin(character) is False or is_accentuated(character))
+                and is_cjk(character) is False
+                and is_hangul(character) is False
+                and is_katakana(character) is False
+                and is_hiragana(character) is False
+                and is_thai(character) is False
             ):
                 self._foreign_long_watch = True
             if (
-                self._per_thread['is_cjk'](character)
-                or self._per_thread['is_hangul'](character)
-                or self._per_thread['is_katakana'](character)
-                or self._per_thread['is_hiragana'](character)
-                or self._per_thread['is_thai'](character)
+                is_cjk(character)
+                or is_hangul(character)
+                or is_katakana(character)
+                or is_hiragana(character)
+                or is_thai(character)
             ):
                 self._buffer_glyph_count += 1
             return
         if not self._buffer:
             return
         if (
-            character.isspace() or self._per_thread['is_punctuation'](character) or is_separator(character)
+            character.isspace() or is_punctuation(character) or is_separator(character)
         ) and self._buffer:
             self._word_count += 1
             buffer_length: int = len(self._buffer)
@@ -353,7 +344,7 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
         elif (
             character not in {"<", ">", "-", "=", "~", "|", "_"}
             and character.isdigit() is False
-            and self._per_thread['is_symbol'](character)
+            and is_symbol(character)
         ):
             self._is_current_word_bad = True
             self._buffer += character
@@ -384,10 +375,9 @@ class CjkUncommonPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         self._character_count: int = 0
         self._uncommon_count: int = 0
-        self._per_thread = SimpleNamespace({k:v for k,v in per_thread.__dict__.items()})
 
     def eligible(self, character: str) -> bool:
-        return self._per_thread.is_cjk(character)
+        return is_cjk(character)
 
     def feed(self, character: str) -> None:
         self._character_count += 1
@@ -430,7 +420,7 @@ class ArchaicUpperLowerPlugin(MessDetectorPlugin):
         return True
 
     def feed(self, character: str) -> None:
-        is_concerned = character.isalpha() and per_thread.is_case_variable(character)
+        is_concerned = character.isalpha() and is_case_variable(character)
         chunk_sep = is_concerned is False
 
         if chunk_sep and self._character_count_since_last_sep > 0:
@@ -492,14 +482,13 @@ class ArabicIsolatedFormPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         self._character_count: int = 0
         self._isolated_form_count: int = 0
-        self._per_thread = SimpleNamespace({k:v for k,v in per_thread.__dict__.items()})
 
     def reset(self) -> None:  # Abstract
         self._character_count = 0
         self._isolated_form_count = 0
 
     def eligible(self, character: str) -> bool:
-        return self._per_thread.is_arabic(character)
+        return is_arabic(character)
 
     def feed(self, character: str) -> None:
         self._character_count += 1
@@ -516,15 +505,10 @@ class ArabicIsolatedFormPlugin(MessDetectorPlugin):
 
         return isolated_form_usage
 
+from .utils import threaded_lru
 
+@threaded_lru(maxsize=1024)
 def is_suspiciously_successive_range(
-    unicode_range_a: str | None, unicode_range_b: str | None
-) -> bool:
-    return _is_suspiciously_successive_range(unicode_range_a, unicode_range_b)
-
-
-@lru_cache(maxsize=1024)
-def _is_suspiciously_successive_range(
     unicode_range_a: str | None, unicode_range_b: str | None
 ) -> bool:
     """
@@ -597,7 +581,7 @@ def _is_suspiciously_successive_range(
     return True
 
 
-@lru_cache(maxsize=2048)
+@threaded_lru(maxsize=2048)
 def mess_ratio(
     decoded_sequence: str, maximum_threshold: float = 0.2, debug: bool = False
 ) -> float:

@@ -14,12 +14,6 @@ from typing import TypeVar, Any, Callable
 T = TypeVar("T")
 
 
-def _lru_cache(*args: Any, **kwargs: Any) -> Callable[[T], T]:
-    def f(x: T) -> T:
-        return x
-
-    return f
-
 
 from re import findall
 from typing import Generator
@@ -44,12 +38,14 @@ def threaded_lru(**kwargs):
 
         loc = threading.local()
 
-        def threaded_inner(char: str) -> bool:
-            if not hasattr(loc, 'func'):
-                print('new loc_func')
-                loc.func = lru_cache(**kwargs)(func)
+        def threaded_inner(*args, **kwargs) -> bool:
+            if 'cached_func' not in loc.__dict__.keys():
+                cached_func = lru_cache(**kwargs)(func)
+                loc.cached_func = cached_func
+            else:
+                cached_func = loc.cached_func
 
-            return loc.func(char)
+            return cached_func(*args, **kwargs)
         return threaded_inner
 
     return threaded_maker
@@ -156,7 +152,7 @@ def is_emoticon(character: str) -> bool:
     return "Emoticons" in character_range or "Pictographs" in character_range
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_separator(character: str) -> bool:
     if character.isspace() or character in {"｜", "+", "<", ">"}:
         return True
@@ -235,7 +231,7 @@ def is_arabic(character: str) -> bool:
 
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_arabic_isolated_form(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -245,12 +241,12 @@ def is_arabic_isolated_form(character: str) -> bool:
     return "ARABIC" in character_name and "ISOLATED FORM" in character_name
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_cjk_uncommon(character: str) -> bool:
     return character not in COMMON_CJK_CHARACTERS
 
 
-@lru_cache(maxsize=len(UNICODE_RANGES_COMBINED))
+@threaded_lru(maxsize=len(UNICODE_RANGES_COMBINED))
 def is_unicode_range_secondary(range_name: str) -> bool:
     return any(keyword in range_name for keyword in UNICODE_SECONDARY_RANGE_KEYWORD)
 
@@ -299,7 +295,7 @@ def any_specified_encoding(sequence: bytes, search_zone: int = 8192) -> str | No
     return None
 
 
-@lru_cache(maxsize=128)
+@threaded_lru(maxsize=128)
 def is_multi_byte_encoding(name: str) -> bool:
     """
     Verify is a specific encoding is a multi byte one based on it IANA name
