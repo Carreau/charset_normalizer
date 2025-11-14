@@ -208,8 +208,10 @@ def performance_compare(arguments):
     print(
         f"\n{'-' * 102}\nTiming Breakdown (using {args.num_threads} thread(s), GIL enabled: {sys._is_gil_enabled()}):\n"
     )
+    print(sys.version)
+    print()
     print(f"Total CD detection time:  {total_cd_time:.2f}s")
-    print(f"Total CN detection time:  {total_cn_time:.2f}s")
+    print(f"Total CN detection time:  {total_cn_time:.2f}s  ({total_cn_time/args.num_threads:.2f} per thread)")
     print(f"Total CN Wall      time:  {charset_n_wall_time:.2f}s")
     print(f"Actual wall time       :  {total_elapsed_time:.2f}s")
 
