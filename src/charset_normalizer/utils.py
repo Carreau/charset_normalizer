@@ -50,6 +50,8 @@ def threaded_lru(**kwargs):
 
     return threaded_maker
 
+threaded_lru = lru_cache
+
 
 @threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_accentuated(character: str) -> bool:
@@ -89,7 +91,7 @@ def unicode_range(character: str) -> str | None:
     """
     character_ord: int = ord(character)
 
-    for range_name, ord_range in UNICODE_RANGES_COMBINED_TUPLES:
+    for range_name, ord_range in UNICODE_RANGES_COMBINED.items():
         if character_ord in ord_range:
             return range_name
 
