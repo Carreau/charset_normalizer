@@ -455,24 +455,3 @@ def cut_sequence_chunks(
                             break
 
             yield chunk
-
-class LocalProxy(threading.local):
-
-
-    def __init__(self, name, /, **kwargs:dict[str, Any]) -> None: # type: ignore
-        print('Init new', name)
-
-        self.__dict__.update({
-            k:
-            lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(v)  #type:ignore
-
-            for k,v in kwargs.items()
-        }) # type: ignore
-
-
-
-#per_thread = LocalProxy('loc1',remove_accent=_remove_accent, is_punctuation=_is_punctuation,
-#                        is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
-#                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range,
-#                        is_unprintable=_is_unprintable, is_symbol=_is_symbol, is_arabic=_is_arabic,
-#                        is_case_variable=_is_case_variable) #type:ignore
