@@ -38,20 +38,25 @@ from .constant import (
     COMMON_CJK_CHARACTERS,
 )
 
-#@thread_lru(*kwargs):
-#    class LRU(threading.local):
-#
-#        def __init__(self, func):
-#            self.func  = lru_cache(**kwargs)(func)
-#
-#        def __call__(self, *args, **kwargs):
-#            return self.func(*args, **kwargs)
-#
-#    def inner(fun):
-#        return LRU(fun)
-#    return inner
 
-def _is_accentuated(character: str) -> bool:
+def threaded_lru(**kwargs):
+    def threaded_maker(func):
+
+        loc = threading.local()
+
+        def threaded_inner(char: str) -> bool:
+            if not hasattr(loc, 'func'):
+                print('new loc_func')
+                loc.func = lru_cache(**kwargs)(func)
+
+            return loc.func(char)
+        return threaded_inner
+
+    return threaded_maker
+
+
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_accentuated(character: str) -> bool:
     try:
         description: str = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -66,11 +71,11 @@ def _is_accentuated(character: str) -> bool:
         or "WITH MACRON" in description
         or "WITH RING ABOVE" in description
     )
-is_accentuated = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_accentuated)
 
 
 
-def _remove_accent(character: str) -> str:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def remove_accent(character: str) -> str:
     decomposed: str = unicodedata.decomposition(character)
     if not decomposed:
         return character
@@ -79,11 +84,10 @@ def _remove_accent(character: str) -> str:
 
     return chr(int(codes[0], 16))
 
-remove_accent = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_remove_accent)
 
 
-
-def _unicode_range(character: str) -> str | None:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def unicode_range(character: str) -> str | None:
     """
     Retrieve the Unicode range official name from a single character.
     """
@@ -95,25 +99,24 @@ def _unicode_range(character: str) -> str | None:
 
     return None
 
-unicode_range = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_unicode_range)
 
 
-def _is_latin(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_latin(character: str) -> bool:
     try:
         description: str = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
     return "LATIN" in description
 
-is_latin = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_latin)
 
 
 def uca(character: str) -> str:
     return unicodedata.category(character)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
-def _is_punctuation(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_punctuation(character: str) -> bool:
     character_category: str = uca(character)
 
     if "P" in character_category:
@@ -126,10 +129,9 @@ def _is_punctuation(character: str) -> bool:
 
     return "Punctuation" in character_range
 
-is_punctuation = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_punctuation)
 
-
-def _is_symbol(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_symbol(character: str) -> bool:
     character_category: str = unicodedata.category(character)
 
     if "S" in character_category or "N" in character_category:
@@ -142,10 +144,9 @@ def _is_symbol(character: str) -> bool:
 
     return "Forms" in character_range and character_category != "Lo"
 
-is_symbol= lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_symbol)
 
 
-@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_emoticon(character: str) -> bool:
     character_range: str | None = unicode_range(character)
 
@@ -165,12 +166,13 @@ def is_separator(character: str) -> bool:
     return "Z" in character_category or character_category in {"Po", "Pd", "Pc"}
 
 
-def _is_case_variable(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_case_variable(character: str) -> bool:
     return character.islower() != character.isupper()
 
-is_case_variable = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_case_variable)
 
-def _is_cjk(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_cjk(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -178,9 +180,9 @@ def _is_cjk(character: str) -> bool:
 
     return "CJK" in character_name
 
-is_cjk = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_cjk)
 
-def _is_hiragana(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_hiragana(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -188,19 +190,19 @@ def _is_hiragana(character: str) -> bool:
 
     return "HIRAGANA" in character_name
 
-is_hiragana = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_hiragana)
 
-def _is_katakana(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_katakana(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
         return False
 
     return "KATAKANA" in character_name
-is_katakana = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_katakana)
 
 
-def _is_hangul(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_hangul(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -209,9 +211,9 @@ def _is_hangul(character: str) -> bool:
     return "HANGUL" in character_name
 
 
-is_hangul = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_hangul)
 
-def _is_thai(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_thai(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -219,10 +221,10 @@ def _is_thai(character: str) -> bool:
 
     return "THAI" in character_name
 
-is_thai = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_thai)
 
 
-def _is_arabic(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_arabic(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
     except ValueError:  # Defensive: unicode database outdated?
@@ -231,7 +233,6 @@ def _is_arabic(character: str) -> bool:
     return "ARABIC" in character_name
 
 
-is_arabic = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_arabic)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -254,7 +255,8 @@ def is_unicode_range_secondary(range_name: str) -> bool:
     return any(keyword in range_name for keyword in UNICODE_SECONDARY_RANGE_KEYWORD)
 
 
-def _is_unprintable(character: str) -> bool:
+@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+def is_unprintable(character: str) -> bool:
     return (
         character.isspace() is False  # includes \n \t \r \v
         and character.isprintable() is False
@@ -263,7 +265,6 @@ def _is_unprintable(character: str) -> bool:
         # Zero Width No-Break Space located in 	Arabic Presentation Forms-B, Unicode 1.1 not acknowledged as space.
     )
 
-is_unprintable = lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(_is_unprintable)
 
 
 def any_specified_encoding(sequence: bytes, search_zone: int = 8192) -> str | None:
@@ -472,8 +473,8 @@ class LocalProxy(threading.local):
 
 
 
-per_thread = LocalProxy('loc1',is_accentuated=_is_accentuated, remove_accent=_remove_accent, is_punctuation=_is_punctuation,
-                        is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
-                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range,
-                        is_unprintable=_is_unprintable, is_symbol=_is_symbol, is_arabic=_is_arabic,
-                        is_case_variable=_is_case_variable) #type:ignore
+#per_thread = LocalProxy('loc1',remove_accent=_remove_accent, is_punctuation=_is_punctuation,
+#                        is_hangul=_is_hangul, is_cjk=_is_cjk, is_latin=is_latin, is_katakana=_is_katakana,
+#                        is_hiragana=_is_hiragana,is_thai=_is_thai, unicode_range=_unicode_range,
+#                        is_unprintable=_is_unprintable, is_symbol=_is_symbol, is_arabic=_is_arabic,
+#                        is_case_variable=_is_case_variable) #type:ignore

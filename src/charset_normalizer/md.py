@@ -22,6 +22,7 @@ from .constant import (
     UNICODE_SECONDARY_RANGE_KEYWORD,
 )
 from .utils import (
+    is_accentuated,
     is_arabic_isolated_form,
     is_case_variable,
     is_emoticon,
@@ -126,7 +127,7 @@ class TooManyAccentuatedPlugin(MessDetectorPlugin):
     def feed(self, character: str) -> None:
         self._character_count += 1
 
-        if per_thread.is_accentuated(character):
+        if is_accentuated(character):
             self._accentuated_count += 1
 
     def reset(self) -> None:  # Abstract
@@ -180,8 +181,8 @@ class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
         self._character_count += 1
         if (
             self._last_latin_character is not None
-            and self._per_thread.is_accentuated(character)
-            and self._per_thread.is_accentuated(self._last_latin_character)
+            and is_accentuated(character)
+            and is_accentuated(self._last_latin_character)
         ):
             if character.isupper() and self._last_latin_character.isupper():
                 self._successive_count += 1
@@ -279,11 +280,11 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
     def feed(self, character: str) -> None:
         if character.isalpha():
             self._buffer += character
-            if self._per_thread['is_accentuated'](character):
+            if is_accentuated(character):
                 self._buffer_accent_count += 1
             if (
                 self._foreign_long_watch is False
-                and (self._per_thread['is_latin'](character) is False or self._per_thread['is_accentuated'](character))
+                and (self._per_thread['is_latin'](character) is False or is_accentuated(character))
                 and self._per_thread['is_cjk'](character) is False
                 and self._per_thread['is_hangul'](character) is False
                 and self._per_thread['is_katakana'](character) is False
@@ -316,7 +317,7 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
                 # Word/Buffer ending with an upper case accentuated letter are so rare,
                 # that we will consider them all as suspicious. Same weight as foreign_long suspicious.
                 elif (
-                    self._per_thread['is_accentuated'](self._buffer[-1])
+                    is_accentuated(self._buffer[-1])
                     and self._buffer[-1].isupper()
                     and all(_.isupper() for _ in self._buffer) is False
                 ):
