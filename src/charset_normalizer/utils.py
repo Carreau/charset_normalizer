@@ -5,14 +5,8 @@ import logging
 import unicodedata
 from codecs import IncrementalDecoder
 from encodings.aliases import aliases
+from functools import lru_cache
 import threading
-
-from functools import lru_cache as lru_cache
-
-from typing import TypeVar, Any, Callable
-
-T = TypeVar("T")
-
 
 
 from re import findall
@@ -53,7 +47,7 @@ def threaded_lru(**kwargs):
 threaded_lru = lru_cache
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_accentuated(character: str) -> bool:
     try:
         description: str = unicodedata.name(character)
@@ -72,7 +66,7 @@ def is_accentuated(character: str) -> bool:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def remove_accent(character: str) -> str:
     decomposed: str = unicodedata.decomposition(character)
     if not decomposed:
@@ -84,7 +78,7 @@ def remove_accent(character: str) -> str:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def unicode_range(character: str) -> str | None:
     """
     Retrieve the Unicode range official name from a single character.
@@ -99,7 +93,7 @@ def unicode_range(character: str) -> str | None:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_latin(character: str) -> bool:
     try:
         description: str = unicodedata.name(character)
@@ -109,13 +103,9 @@ def is_latin(character: str) -> bool:
 
 
 
-def uca(character: str) -> str:
-    return unicodedata.category(character)
-
-
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_punctuation(character: str) -> bool:
-    character_category: str = uca(character)
+    character_category: str = unicodedata.category(character)
 
     if "P" in character_category:
         return True
@@ -128,7 +118,7 @@ def is_punctuation(character: str) -> bool:
     return "Punctuation" in character_range
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_symbol(character: str) -> bool:
     character_category: str = unicodedata.category(character)
 
@@ -144,7 +134,7 @@ def is_symbol(character: str) -> bool:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_emoticon(character: str) -> bool:
     character_range: str | None = unicode_range(character)
 
@@ -154,7 +144,7 @@ def is_emoticon(character: str) -> bool:
     return "Emoticons" in character_range or "Pictographs" in character_range
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_separator(character: str) -> bool:
     if character.isspace() or character in {"｜", "+", "<", ">"}:
         return True
@@ -164,12 +154,12 @@ def is_separator(character: str) -> bool:
     return "Z" in character_category or character_category in {"Po", "Pd", "Pc"}
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_case_variable(character: str) -> bool:
     return character.islower() != character.isupper()
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_cjk(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -179,7 +169,7 @@ def is_cjk(character: str) -> bool:
     return "CJK" in character_name
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_hiragana(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -189,7 +179,7 @@ def is_hiragana(character: str) -> bool:
     return "HIRAGANA" in character_name
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_katakana(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -199,7 +189,7 @@ def is_katakana(character: str) -> bool:
     return "KATAKANA" in character_name
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_hangul(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -210,7 +200,7 @@ def is_hangul(character: str) -> bool:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_thai(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -221,7 +211,7 @@ def is_thai(character: str) -> bool:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_arabic(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -233,7 +223,7 @@ def is_arabic(character: str) -> bool:
 
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_arabic_isolated_form(character: str) -> bool:
     try:
         character_name = unicodedata.name(character)
@@ -243,17 +233,17 @@ def is_arabic_isolated_form(character: str) -> bool:
     return "ARABIC" in character_name and "ISOLATED FORM" in character_name
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_cjk_uncommon(character: str) -> bool:
     return character not in COMMON_CJK_CHARACTERS
 
 
-@threaded_lru(maxsize=len(UNICODE_RANGES_COMBINED))
+@lru_cache(maxsize=len(UNICODE_RANGES_COMBINED))
 def is_unicode_range_secondary(range_name: str) -> bool:
     return any(keyword in range_name for keyword in UNICODE_SECONDARY_RANGE_KEYWORD)
 
 
-@threaded_lru(maxsize=UTF8_MAXIMAL_ALLOCATION)
+@lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_unprintable(character: str) -> bool:
     return (
         character.isspace() is False  # includes \n \t \r \v
@@ -297,7 +287,7 @@ def any_specified_encoding(sequence: bytes, search_zone: int = 8192) -> str | No
     return None
 
 
-@threaded_lru(maxsize=128)
+@lru_cache(maxsize=128)
 def is_multi_byte_encoding(name: str) -> bool:
     """
     Verify is a specific encoding is a multi byte one based on it IANA name
