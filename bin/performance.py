@@ -186,16 +186,22 @@ def performance_compare(arguments):
         # chardet would be high.
         charset_n_wall_time_start = perf_counter_ns()
         with ThreadPoolExecutor(max_workers=args.num_threads) as executor:
-            # Submit all files to the thread pool
-            future_to_path = {
-                executor.submit(process_file_cn, tbt_path, args.size_coeff): tbt_path
-                for tbt_path in file_list
+            # Create batches: distribute every nth file round-robin
+            batches = [[] for _ in range(args.num_threads)]
+            for idx, file_path in enumerate(file_list):
+                batch_idx = idx % args.num_threads
+                batches[batch_idx].append(file_path)
+
+            # Submit batches to the thread pool
+            future_to_batch = {
+                executor.submit(process_file_cn, batch, args.size_coeff): batch
+                for batch in batches
             }
 
             # Process results as they complete
-            for completed, future in enumerate(as_completed(future_to_path)):
+            files_processed = 0
+            for future in as_completed(future_to_batch):
                 batch_results = future.result()
-                tbt_path = future_to_path[future]
 
                 # Process all results in the batch
                 for file_path, charset_normalizer_time in batch_results.items():
@@ -205,11 +211,12 @@ def performance_compare(arguments):
                     cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
                     if not args.quiet:
                         print(
-                            f"{completed:>3}/{total_files} {file_path:<82} C:{chardet_time:10.5f}  "
+                            f"{files_processed:>3}/{total_files} {file_path:<82} C:{chardet_time:10.5f}  "
                             f"CN:{charset_normalizer_time:10.5f}  {cn_faster:5.1f} %"
                         )
                     else:
-                        print(f"\r{completed}/{total_files}", end="")
+                        print(f"\r{files_processed}/{total_files}", end="")
+                    files_processed += 1
         charset_n_wall_time = (perf_counter_ns() - charset_n_wall_time_start) / NANO
     print()
 
