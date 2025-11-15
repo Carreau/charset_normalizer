@@ -41,18 +41,34 @@ def process_file_cd(tbt_path: str, size_coeff: int):
     return tbt_path, chardet_time / NANO
 
 
-def process_file_cn(tbt_path: str, size_coeff: int):
+def process_file_cn(tbt_paths: list[str] | str, size_coeff: int):
     """
-    Process a single file and return timing results for charset_normalizer.
+    Process a batch of files (or a single file) and return timing results for charset_normalizer.
+
+    Args:
+        tbt_paths: Either a list of file paths or a single file path string
+        size_coeff: Size coefficient to multiply file content
+
+    Returns:
+        Dictionary mapping file paths to their processing times in seconds
     """
-    with open(tbt_path, "rb") as fp:
-        content = fp.read() * size_coeff
+    # Handle both single path and batch of paths
+    if isinstance(tbt_paths, str):
+        tbt_paths = [tbt_paths]
 
-    before = perf_counter_ns()
-    detect(content)
-    charset_normalizer_time = perf_counter_ns() - before
+    results = {}
 
-    return tbt_path, charset_normalizer_time / NANO
+    for tbt_path in tbt_paths:
+        with open(tbt_path, "rb") as fp:
+            content = fp.read() * size_coeff
+
+        before = perf_counter_ns()
+        detect(content)
+        charset_normalizer_time = perf_counter_ns() - before
+
+        results[tbt_path] = charset_normalizer_time / NANO
+
+    return results
 
 
 def performance_compare(arguments):
@@ -141,14 +157,13 @@ def performance_compare(arguments):
         if args.num_threads == 0:
             charset_n_wall_time_start = perf_counter_ns()
 
-            tbt_path, charset_normalizer_time = process_file_cn(
-                tbt_path, args.size_coeff
-            )
+            batch_results = process_file_cn(tbt_path, args.size_coeff)
 
             charset_n_wall_time += (
                 perf_counter_ns() - charset_n_wall_time_start
             ) / NANO
 
+            charset_normalizer_time = batch_results[tbt_path]
             charset_normalizer_results[tbt_path] = charset_normalizer_time
 
             cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
@@ -179,22 +194,22 @@ def performance_compare(arguments):
 
             # Process results as they complete
             for completed, future in enumerate(as_completed(future_to_path)):
-                (
-                    tbt_path,
-                    charset_normalizer_time,
-                ) = future.result()
-                charset_normalizer_results[tbt_path] = charset_normalizer_time
+                batch_results = future.result()
+                tbt_path = future_to_path[future]
 
-                charset_normalizer_time = charset_normalizer_time
-                chardet_time = chardet_results[tbt_path]
-                cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
-                if not args.quiet:
-                    print(
-                        f"{completed:>3}/{total_files} {tbt_path:<82} C:{chardet_time:10.5f}  "
-                        f"CN:{charset_normalizer_time:10.5f}  {cn_faster:5.1f} %"
-                    )
-                else:
-                    print(f"\r{completed}/{total_files}", end="")
+                # Process all results in the batch
+                for file_path, charset_normalizer_time in batch_results.items():
+                    charset_normalizer_results[file_path] = charset_normalizer_time
+
+                    chardet_time = chardet_results[file_path]
+                    cn_faster = (chardet_time / charset_normalizer_time) * 100 - 100
+                    if not args.quiet:
+                        print(
+                            f"{completed:>3}/{total_files} {file_path:<82} C:{chardet_time:10.5f}  "
+                            f"CN:{charset_normalizer_time:10.5f}  {cn_faster:5.1f} %"
+                        )
+                    else:
+                        print(f"\r{completed}/{total_files}", end="")
         charset_n_wall_time = (perf_counter_ns() - charset_n_wall_time_start) / NANO
     print()
 
