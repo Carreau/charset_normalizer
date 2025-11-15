@@ -2,15 +2,10 @@ from __future__ import annotations
 
 import importlib
 import logging
-import sysconfig
-import threading
 import unicodedata
 from codecs import IncrementalDecoder
 from encodings.aliases import aliases
-from functools import lru_cache as _lru_cache
-from typing import TypeVar, Any, Callable
-
-
+from functools import lru_cache
 from re import findall
 from typing import Generator
 
@@ -27,58 +22,6 @@ from .constant import (
     UTF8_MAXIMAL_ALLOCATION,
     COMMON_CJK_CHARACTERS,
 )
-
-UNICODE_RANGES_COMBINED_TUPLES = tuple(
-    [(k, v) for k, v in UNICODE_RANGES_COMBINED.items()]
-)
-
-# T should be a Callable[[VarArg(Any), KwArg(Any)], Any], but this requires
-# importing mypy_extension
-T = TypeVar("T")
-
-is_freethreaded = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
-
-
-if is_freethreaded:
-
-    def lru_cache(**kwargs: Any) -> Callable[[T], T]:
-        """
-        A version of lru_cache which will store a cached function per thread
-
-        This avoids contention on the lru_cache backing dict on free-threaded
-        python, it has the drawback of storing 1 cache per thread, so increase
-        memory consumption.
-        """
-
-        def proxy_maker(func: T) -> T:
-            """
-            Actual decorator, which will return a proxy function, which
-            will call a different cache function depending on the thread.
-            """
-            loc = threading.local()
-
-            def threaded_inner(*args: Any, **kwargs: Any) -> Any:
-                """
-                proxy function, check outer threadlocal for
-                a cached function, otherwise cache it.
-
-                Call the cached function.
-
-                """
-                # we avoid getattr and other which are much slower
-                if (cached_func := loc.__dict__.get("cached_func")) is None:
-                    cached_func = _lru_cache(**kwargs)(func)
-                    loc.cached_func = cached_func
-
-                # accessing loc.<anything> can be slow, do it as little as
-                # possible
-                return cached_func(*args, **kwargs)
-
-            return threaded_inner  # type: ignore[return-value]
-
-        return proxy_maker
-else:
-    lru_cache = _lru_cache  # type: ignore[assignment]
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -117,7 +60,7 @@ def unicode_range(character: str) -> str | None:
     """
     character_ord: int = ord(character)
 
-    for range_name, ord_range in UNICODE_RANGES_COMBINED_TUPLES:
+    for range_name, ord_range in UNICODE_RANGES_COMBINED.items():
         if character_ord in ord_range:
             return range_name
 

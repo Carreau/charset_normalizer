@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 from codecs import IncrementalDecoder
 from collections import Counter
+from functools import lru_cache
 from typing import Counter as TypeCounter
 
 from .constant import (
@@ -20,7 +21,6 @@ from .utils import (
     is_multi_byte_encoding,
     is_unicode_range_secondary,
     unicode_range,
-    lru_cache,
 )
 
 
