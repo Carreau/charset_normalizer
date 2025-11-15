@@ -56,6 +56,7 @@ if is_freethreaded:
             will call a different cache function depending on the thread.
             """
             loc = threading.local()
+            threading.get_ident()
 
             def threaded_inner(*args: Any, **kwargs: Any) -> Any:
                 """
@@ -79,6 +80,53 @@ if is_freethreaded:
         return proxy_maker
 else:
     lru_cache = _lru_cache  # type: ignore[assignment]
+
+
+def __lru_cache(**kwargs: Any) -> Callable[[T], T]:
+    return lambda _: _
+
+
+# lru_cache = __lru_cache # type:ignore
+
+meths = {}
+
+# def lru_cache(**kw):
+#
+#    def _inner(meth):
+#        meths[meth.__name__] = meth
+#        return _lru_cache(**kw)(meth)
+#    return _inner
+
+
+class LocalProxy(threading.local):
+    def lru_cache(self, **kw):
+        def _inner(meth):
+            meths[meth.__name__] = meth
+            self.regen()
+            return _lru_cache(**kw)(meth)
+
+        return _inner
+
+    def __init__(self, /, **kwargs: dict[str, Any]) -> None:  # type: ignore
+        print("New Proxy")
+        self.regen()
+
+    def regen(self):
+        from types import SimpleNamespace
+
+        self.__dict__.update(
+            {
+                "meths": SimpleNamespace(
+                    {
+                        k: _lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(v)  # type:ignore
+                        for k, v in meths.items()
+                    }
+                )
+            }
+        )  # type: ignore
+
+
+lru_cache = LocalProxy().lru_cache
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -469,3 +517,6 @@ def cut_sequence_chunks(
                             break
 
             yield chunk
+
+
+per_thread = LocalProxy()
