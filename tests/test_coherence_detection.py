@@ -6,8 +6,8 @@ from charset_normalizer.cd import (
     encoding_languages,
     filter_alt_coherence_matches,
     get_target_features,
-    is_multi_byte_encoding,
     mb_encoding_languages,
+    per_thread,
 )
 
 
@@ -28,7 +28,7 @@ from charset_normalizer.cd import (
 def test_infer_language_from_cp(iana_encoding, expected_languages):
     languages = (
         mb_encoding_languages(iana_encoding)
-        if is_multi_byte_encoding(iana_encoding)
+        if per_thread.is_multi_byte_encoding(iana_encoding)
         else encoding_languages(iana_encoding)
     )
 
