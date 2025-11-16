@@ -98,14 +98,19 @@ meths = {}
 #    return _inner
 
 
+def fal(*args, **kwargs):
+    assert False
+
+
 class LocalProxy(threading.local):
     def lru_cache(self, **kw):
         def _inner(meth):
-            meths[meth.__name__] = meth
+            meths[meth.__name__] = (kw, meth)
             self.regen()
-            return meth
+            return fal
             return _lru_cache(**kw)(meth)
 
+        self.regen()
         return _inner
 
     def __init__(self, /, **kwargs: dict[str, Any]) -> None:  # type: ignore
@@ -126,8 +131,8 @@ class LocalProxy(threading.local):
             {
                 "meths": SimpleNamespace(
                     {
-                        k: recacher(v)  # type:ignore
-                        for k, v in meths.items()
+                        k: _lru_cache(**v)(m)  # type:ignore
+                        for k, (v, m) in meths.items()
                     }
                 )
             }
@@ -196,7 +201,7 @@ def is_punctuation(character: str) -> bool:
     if "P" in character_category:
         return True
 
-    character_range: str | None = unicode_range(character)
+    character_range: str | None = per_thread.meths.unicode_range(character)
 
     if character_range is None:
         return False
@@ -211,7 +216,7 @@ def is_symbol(character: str) -> bool:
     if "S" in character_category or "N" in character_category:
         return True
 
-    character_range: str | None = unicode_range(character)
+    character_range: str | None = per_thread.meths.unicode_range(character)
 
     if character_range is None:
         return False
@@ -221,7 +226,7 @@ def is_symbol(character: str) -> bool:
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
 def is_emoticon(character: str) -> bool:
-    character_range: str | None = unicode_range(character)
+    character_range: str | None = per_thread.meths.unicode_range(character)
 
     if character_range is None:
         return False

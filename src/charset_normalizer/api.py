@@ -21,6 +21,7 @@ from .utils import (
     is_cp_similar,
     is_multi_byte_encoding,
     should_strip_sig_or_bom,
+    per_thread,
 )
 
 logger = logging.getLogger("charset_normalizer")
@@ -211,7 +212,9 @@ def from_bytes(
             continue
 
         try:
-            is_multi_byte_decoder: bool = is_multi_byte_encoding(encoding_iana)
+            is_multi_byte_decoder: bool = per_thread.meths.is_multi_byte_encoding(
+                encoding_iana
+            )
         except (ModuleNotFoundError, ImportError):
             logger.log(
                 TRACE,
@@ -310,7 +313,7 @@ def from_bytes(
                 md_chunks.append(chunk)
 
                 md_ratios.append(
-                    mess_ratio(
+                    per_thread.meths.mess_ratio(
                         chunk,
                         threshold,
                         explain is True and 1 <= len(cp_isolation) <= 2,

@@ -14,13 +14,9 @@ from .constant import (
 )
 from .md import is_suspiciously_successive_range
 from .models import CoherenceMatches
+from functools import lru_cache
 from .utils import (
-    is_accentuated,
-    is_latin,
-    is_multi_byte_encoding,
-    is_unicode_range_secondary,
-    unicode_range,
-    lru_cache,
+    per_thread,
 )
 
 
@@ -28,7 +24,7 @@ def encoding_unicode_range(iana_name: str) -> list[str]:
     """
     Return associated unicode ranges in a single byte code page.
     """
-    if is_multi_byte_encoding(iana_name):
+    if per_thread.meths.is_multi_byte_encoding(iana_name):
         raise OSError("Function not supported on multi-byte code page")
 
     decoder = importlib.import_module(f"encodings.{iana_name}").IncrementalDecoder
@@ -41,12 +37,12 @@ def encoding_unicode_range(iana_name: str) -> list[str]:
         chunk: str = p.decode(bytes([i]))
 
         if chunk:
-            character_range: str | None = unicode_range(chunk)
+            character_range: str | None = per_thread.meths.unicode_range(chunk)
 
             if character_range is None:
                 continue
 
-            if is_unicode_range_secondary(character_range) is False:
+            if per_thread.meths.is_unicode_range_secondary(character_range) is False:
                 if character_range not in seen_ranges:
                     seen_ranges[character_range] = 0
                 seen_ranges[character_range] += 1
@@ -69,7 +65,7 @@ def unicode_range_languages(primary_range: str) -> list[str]:
 
     for language, characters in FREQUENCIES.items():
         for character in characters:
-            if unicode_range(character) == primary_range:
+            if per_thread.meths.unicode_range(character) == primary_range:
                 languages.append(language)
                 break
 
@@ -126,9 +122,9 @@ def get_target_features(language: str) -> tuple[bool, bool]:
     target_pure_latin: bool = True
 
     for character in FREQUENCIES[language]:
-        if not target_have_accents and is_accentuated(character):
+        if not target_have_accents and per_thread.meths.is_accentuated(character):
             target_have_accents = True
-        if target_pure_latin and is_latin(character) is False:
+        if target_pure_latin and per_thread.meths.is_latin(character) is False:
             target_pure_latin = False
 
     return target_have_accents, target_pure_latin
@@ -142,7 +138,9 @@ def alphabet_languages(
     """
     languages: list[tuple[str, float]] = []
 
-    source_have_accents = any(is_accentuated(character) for character in characters)
+    source_have_accents = any(
+        per_thread.meths.is_accentuated(character) for character in characters
+    )
 
     for language, language_characters in FREQUENCIES.items():
         target_have_accents, target_pure_latin = get_target_features(language)
@@ -261,7 +259,7 @@ def alpha_unicode_split(decoded_sequence: str) -> list[str]:
         if character.isalpha() is False:
             continue
 
-        character_range: str | None = unicode_range(character)
+        character_range: str | None = per_thread.meths.unicode_range(character)
 
         if character_range is None:
             continue
@@ -270,7 +268,9 @@ def alpha_unicode_split(decoded_sequence: str) -> list[str]:
 
         for discovered_range in layers:
             if (
-                is_suspiciously_successive_range(discovered_range, character_range)
+                per_thread.meths.is_suspiciously_successive_range(
+                    discovered_range, character_range
+                )
                 is False
             ):
                 layer_target_range = discovered_range

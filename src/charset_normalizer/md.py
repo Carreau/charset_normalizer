@@ -8,24 +8,6 @@ from .constant import (
     UNICODE_SECONDARY_RANGE_KEYWORD,
 )
 from .utils import (
-    is_accentuated,
-    is_arabic,
-    is_arabic_isolated_form,
-    is_case_variable,
-    is_cjk,
-    is_emoticon,
-    is_hangul,
-    is_hiragana,
-    is_katakana,
-    is_latin,
-    is_punctuation,
-    is_separator,
-    is_symbol,
-    is_thai,
-    is_unprintable,
-    remove_accent,
-    unicode_range,
-    is_cjk_uncommon,
     lru_cache,
     per_thread,
 )
@@ -191,7 +173,9 @@ class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
             if character.isupper() and self._last_latin_character.isupper():
                 self._successive_count += 1
             # Worse if its the same char duplicated with different accent.
-            if remove_accent(character) == remove_accent(self._last_latin_character):
+            if self.utils.remove_accent(character) == self.utils.remove_accent(
+                self._last_latin_character
+            ):
                 self._successive_count += 1
         self._last_latin_character = character
 
@@ -233,8 +217,10 @@ class SuspiciousRange(MessDetectorPlugin):
             self._last_printable_seen = character
             return
 
-        unicode_range_a: str | None = unicode_range(self._last_printable_seen)
-        unicode_range_b: str | None = unicode_range(character)
+        unicode_range_a: str | None = per_thread.meths.unicode_range(
+            self._last_printable_seen
+        )
+        unicode_range_b: str | None = per_thread.meths.unicode_range(character)
 
         if self.utils.is_suspiciously_successive_range(
             unicode_range_a, unicode_range_b
@@ -288,7 +274,8 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
             if (
                 self._foreign_long_watch is False
                 and (
-                    is_latin(character) is False or self.utils.is_accentuated(character)
+                    self.utils.is_latin(character) is False
+                    or self.utils.is_accentuated(character)
                 )
                 and self.utils.is_cjk(character) is False
                 and self.utils.is_hangul(character) is False
@@ -523,7 +510,6 @@ class ArabicIsolatedFormPlugin(MessDetectorPlugin):
         isolated_form_usage: float = self._isolated_form_count / self._character_count
 
         return isolated_form_usage
-
 
 @lru_cache(maxsize=1024)
 def is_suspiciously_successive_range(
