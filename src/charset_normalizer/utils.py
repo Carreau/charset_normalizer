@@ -103,6 +103,7 @@ class LocalProxy(threading.local):
         def _inner(meth):
             meths[meth.__name__] = meth
             self.regen()
+            return meth
             return _lru_cache(**kw)(meth)
 
         return _inner
@@ -114,11 +115,18 @@ class LocalProxy(threading.local):
     def regen(self):
         from types import SimpleNamespace
 
+        def recacher(f):
+            @_lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
+            def g(*args, **kwargs):
+                return f(*args, **kwargs)
+
+            return g
+
         self.__dict__.update(
             {
                 "meths": SimpleNamespace(
                     {
-                        k: _lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)(v)  # type:ignore
+                        k: recacher(v)  # type:ignore
                         for k, v in meths.items()
                     }
                 )
