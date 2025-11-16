@@ -7,6 +7,7 @@ from typing import Counter as TypeCounter
 
 from .constant import (
     FREQUENCIES,
+    FREQ_SET,
     KO_NAMES,
     LANGUAGE_SUPPORTED_COUNT,
     TOO_SMALL_SEQUENCE,
@@ -179,7 +180,7 @@ def characters_popularity_compare(
         raise ValueError(f"{language} not available")
 
     character_approved_count: int = 0
-    FREQUENCIES_language_set = set(FREQUENCIES[language])
+    FREQUENCIES_language_set: frozenset = FREQ_SET[language]
 
     ordered_characters_count: int = len(ordered_characters)
     target_language_characters_count: int = len(FREQUENCIES[language])
@@ -255,11 +256,13 @@ def alpha_unicode_split(decoded_sequence: str) -> list[str]:
     """
     layers: dict[str, str] = {}
 
+    meths = per_thread.meths
+
     for character in decoded_sequence:
         if character.isalpha() is False:
             continue
 
-        character_range: str | None = per_thread.meths.unicode_range(character)
+        character_range: str | None = meths.unicode_range(character)
 
         if character_range is None:
             continue
@@ -268,7 +271,7 @@ def alpha_unicode_split(decoded_sequence: str) -> list[str]:
 
         for discovered_range in layers:
             if (
-                per_thread.meths.is_suspiciously_successive_range(
+                meths.is_suspiciously_successive_range(
                     discovered_range, character_range
                 )
                 is False

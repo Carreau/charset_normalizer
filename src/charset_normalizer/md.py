@@ -13,6 +13,13 @@ from .utils import (
 )
 
 
+subc = []
+
+
+def add(c):
+    subc.append(c)
+    return c
+
 class MessDetectorPlugin:
     """
     Base abstract class used for mess detection plugins.
@@ -50,7 +57,7 @@ class MessDetectorPlugin:
         """
         raise NotImplementedError  # pragma: nocover
 
-
+@add
 class TooManySymbolOrPunctuationPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -99,6 +106,7 @@ class TooManySymbolOrPunctuationPlugin(MessDetectorPlugin):
         return ratio_of_punctuation if ratio_of_punctuation >= 0.3 else 0.0
 
 
+@add
 class TooManyAccentuatedPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -127,6 +135,7 @@ class TooManyAccentuatedPlugin(MessDetectorPlugin):
         return ratio_of_accentuation if ratio_of_accentuation >= 0.35 else 0.0
 
 
+@add
 class UnprintablePlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -152,6 +161,7 @@ class UnprintablePlugin(MessDetectorPlugin):
         return (self._unprintable_count * 8) / self._character_count
 
 
+@add
 class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -192,6 +202,7 @@ class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
         return (self._successive_count * 2) / self._character_count
 
 
+@add
 class SuspiciousRange(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -217,10 +228,10 @@ class SuspiciousRange(MessDetectorPlugin):
             self._last_printable_seen = character
             return
 
-        unicode_range_a: str | None = per_thread.meths.unicode_range(
+        unicode_range_a: str | None = self.utils.unicode_range(
             self._last_printable_seen
         )
-        unicode_range_b: str | None = per_thread.meths.unicode_range(character)
+        unicode_range_b: str | None = self.utils.unicode_range(character)
 
         if self.utils.is_suspiciously_successive_range(
             unicode_range_a, unicode_range_b
@@ -246,6 +257,7 @@ class SuspiciousRange(MessDetectorPlugin):
         return ratio_of_suspicious_range_usage
 
 
+@add
 class SuperWeirdWordPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -370,6 +382,7 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
         return self._bad_character_count / self._character_count
 
 
+@add
 class CjkUncommonPlugin(MessDetectorPlugin):
     """
     Detect messy CJK text that probably means nothing.
@@ -406,6 +419,7 @@ class CjkUncommonPlugin(MessDetectorPlugin):
         return uncommon_form_usage / 10 if uncommon_form_usage > 0.5 else 0.0
 
 
+@add
 class ArchaicUpperLowerPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -483,6 +497,7 @@ class ArchaicUpperLowerPlugin(MessDetectorPlugin):
         return self._successive_upper_lower_count_final / self._character_count
 
 
+@add
 class ArabicIsolatedFormPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -585,7 +600,8 @@ def is_suspiciously_successive_range(
     return True
 
 
-classes = MessDetectorPlugin.__subclasses__()
+classes = frozenset(subc)
+
 @lru_cache(maxsize=2048)
 def mess_ratio(
     decoded_sequence: str, maximum_threshold: float = 0.2, debug: bool = False
@@ -620,21 +636,21 @@ def mess_ratio(
             if mean_mess_ratio >= maximum_threshold:
                 break
 
-    # if debug:
-    #    logger = getLogger("charset_normalizer")
+    if debug:
+        logger = getLogger("charset_normalizer")
 
-    #    logger.log(
-    #        TRACE,
-    #        "Mess-detector extended-analysis start. "
-    #        f"intermediary_mean_mess_ratio_calc={intermediary_mean_mess_ratio_calc} mean_mess_ratio={mean_mess_ratio} "
-    #        f"maximum_threshold={maximum_threshold}",
-    #    )
+        logger.log(
+            TRACE,
+            "Mess-detector extended-analysis start. "
+            f"intermediary_mean_mess_ratio_calc={intermediary_mean_mess_ratio_calc} mean_mess_ratio={mean_mess_ratio} "
+            f"maximum_threshold={maximum_threshold}",
+        )
 
-    #    if len(decoded_sequence) > 16:
-    #        logger.log(TRACE, f"Starting with: {decoded_sequence[:16]}")
-    #        logger.log(TRACE, f"Ending with: {decoded_sequence[-16::]}")
+        if len(decoded_sequence) > 16:
+            logger.log(TRACE, f"Starting with: {decoded_sequence[:16]}")
+            logger.log(TRACE, f"Ending with: {decoded_sequence[-16::]}")
 
-    #    for dt in detectors:
-    #        logger.log(TRACE, f"{dt.__class__}: {dt.ratio}")
+        for dt in detectors:
+            logger.log(TRACE, f"{dt.__class__}: {dt.ratio}")
 
     return round(mean_mess_ratio, 3)

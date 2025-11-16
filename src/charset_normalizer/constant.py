@@ -2015,3 +2015,4 @@ FREQUENCIES: dict[str, list[str]] = {
 }
 
 LANGUAGE_SUPPORTED_COUNT: int = len(FREQUENCIES)
+FREQ_SET = {k: frozenset(v) for k, v in FREQUENCIES.items()}
