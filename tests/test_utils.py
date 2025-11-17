@@ -4,7 +4,9 @@ import logging
 
 import pytest
 
-from charset_normalizer.utils import cp_similarity, is_accentuated, set_logging_handler
+from charset_normalizer.utils import cp_similarity, get_thread_local_copies, set_logging_handler
+
+
 
 
 @pytest.mark.parametrize(
@@ -30,6 +32,7 @@ from charset_normalizer.utils import cp_similarity, is_accentuated, set_logging_
     ],
 )
 def test_is_accentuated(character, expected_is_accentuated):
+    is_accentuated = get_thread_local_copies().is_accentuated
     assert (
         is_accentuated(character) is expected_is_accentuated
     ), "is_accentuated behavior incomplete"

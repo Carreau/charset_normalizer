@@ -8,28 +8,19 @@ from .constant import (
     UNICODE_SECONDARY_RANGE_KEYWORD,
 )
 from .utils import (
-    is_accentuated,
-    is_arabic,
-    is_arabic_isolated_form,
-    is_case_variable,
-    is_cjk,
-    is_emoticon,
-    is_hangul,
-    is_hiragana,
-    is_katakana,
-    is_latin,
-    is_punctuation,
-    is_separator,
-    is_symbol,
-    is_thai,
-    is_unprintable,
-    remove_accent,
-    unicode_range,
-    is_cjk_uncommon,
-    lru_cache,
-    per_thread,
+    lru_cache as per_thread_lru_cache,
+    get_thread_local_copies
 )
 
+from functools import lru_cache
+
+
+subc = []
+
+
+def add(c):
+    subc.append(c)
+    return c
 
 class MessDetectorPlugin:
     """
@@ -39,7 +30,7 @@ class MessDetectorPlugin:
 
     def __init__(self):
         super().__init__()
-        self.utils = per_thread.meths
+        self.utils = get_thread_local_copies()
 
     def eligible(self, character: str) -> bool:
         """
@@ -68,7 +59,7 @@ class MessDetectorPlugin:
         """
         raise NotImplementedError  # pragma: nocover
 
-
+@add
 class TooManySymbolOrPunctuationPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -117,6 +108,7 @@ class TooManySymbolOrPunctuationPlugin(MessDetectorPlugin):
         return ratio_of_punctuation if ratio_of_punctuation >= 0.3 else 0.0
 
 
+@add
 class TooManyAccentuatedPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -145,6 +137,7 @@ class TooManyAccentuatedPlugin(MessDetectorPlugin):
         return ratio_of_accentuation if ratio_of_accentuation >= 0.35 else 0.0
 
 
+@add
 class UnprintablePlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -170,6 +163,7 @@ class UnprintablePlugin(MessDetectorPlugin):
         return (self._unprintable_count * 8) / self._character_count
 
 
+@add
 class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -191,7 +185,9 @@ class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
             if character.isupper() and self._last_latin_character.isupper():
                 self._successive_count += 1
             # Worse if its the same char duplicated with different accent.
-            if remove_accent(character) == remove_accent(self._last_latin_character):
+            if self.utils.remove_accent(character) == self.utils.remove_accent(
+                self._last_latin_character
+            ):
                 self._successive_count += 1
         self._last_latin_character = character
 
@@ -208,6 +204,7 @@ class SuspiciousDuplicateAccentPlugin(MessDetectorPlugin):
         return (self._successive_count * 2) / self._character_count
 
 
+@add
 class SuspiciousRange(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -233,10 +230,12 @@ class SuspiciousRange(MessDetectorPlugin):
             self._last_printable_seen = character
             return
 
-        unicode_range_a: str | None = unicode_range(self._last_printable_seen)
-        unicode_range_b: str | None = unicode_range(character)
+        unicode_range_a: str | None = self.utils.unicode_range(
+            self._last_printable_seen
+        )
+        unicode_range_b: str | None = self.utils.unicode_range(character)
 
-        if self.utils.is_suspiciously_successive_range(
+        if is_suspiciously_successive_range(
             unicode_range_a, unicode_range_b
         ):
             self._suspicious_successive_range_count += 1
@@ -260,6 +259,7 @@ class SuspiciousRange(MessDetectorPlugin):
         return ratio_of_suspicious_range_usage
 
 
+@add
 class SuperWeirdWordPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -288,7 +288,8 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
             if (
                 self._foreign_long_watch is False
                 and (
-                    is_latin(character) is False or self.utils.is_accentuated(character)
+                    self.utils.is_latin(character) is False
+                    or self.utils.is_accentuated(character)
                 )
                 and self.utils.is_cjk(character) is False
                 and self.utils.is_hangul(character) is False
@@ -383,6 +384,7 @@ class SuperWeirdWordPlugin(MessDetectorPlugin):
         return self._bad_character_count / self._character_count
 
 
+@add
 class CjkUncommonPlugin(MessDetectorPlugin):
     """
     Detect messy CJK text that probably means nothing.
@@ -419,6 +421,7 @@ class CjkUncommonPlugin(MessDetectorPlugin):
         return uncommon_form_usage / 10 if uncommon_form_usage > 0.5 else 0.0
 
 
+@add
 class ArchaicUpperLowerPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -496,6 +499,7 @@ class ArchaicUpperLowerPlugin(MessDetectorPlugin):
         return self._successive_upper_lower_count_final / self._character_count
 
 
+@add
 class ArabicIsolatedFormPlugin(MessDetectorPlugin):
     def __init__(self) -> None:
         super().__init__()
@@ -523,7 +527,6 @@ class ArabicIsolatedFormPlugin(MessDetectorPlugin):
         isolated_form_usage: float = self._isolated_form_count / self._character_count
 
         return isolated_form_usage
-
 
 @lru_cache(maxsize=1024)
 def is_suspiciously_successive_range(
@@ -599,7 +602,8 @@ def is_suspiciously_successive_range(
     return True
 
 
-classes = MessDetectorPlugin.__subclasses__()
+classes = frozenset(subc)
+
 @lru_cache(maxsize=2048)
 def mess_ratio(
     decoded_sequence: str, maximum_threshold: float = 0.2, debug: bool = False
@@ -634,21 +638,21 @@ def mess_ratio(
             if mean_mess_ratio >= maximum_threshold:
                 break
 
-    # if debug:
-    #    logger = getLogger("charset_normalizer")
+    if debug:
+        logger = getLogger("charset_normalizer")
 
-    #    logger.log(
-    #        TRACE,
-    #        "Mess-detector extended-analysis start. "
-    #        f"intermediary_mean_mess_ratio_calc={intermediary_mean_mess_ratio_calc} mean_mess_ratio={mean_mess_ratio} "
-    #        f"maximum_threshold={maximum_threshold}",
-    #    )
+        logger.log(
+            TRACE,
+            "Mess-detector extended-analysis start. "
+            f"intermediary_mean_mess_ratio_calc={intermediary_mean_mess_ratio_calc} mean_mess_ratio={mean_mess_ratio} "
+            f"maximum_threshold={maximum_threshold}",
+        )
 
-    #    if len(decoded_sequence) > 16:
-    #        logger.log(TRACE, f"Starting with: {decoded_sequence[:16]}")
-    #        logger.log(TRACE, f"Ending with: {decoded_sequence[-16::]}")
+        if len(decoded_sequence) > 16:
+            logger.log(TRACE, f"Starting with: {decoded_sequence[:16]}")
+            logger.log(TRACE, f"Ending with: {decoded_sequence[-16::]}")
 
-    #    for dt in detectors:
-    #        logger.log(TRACE, f"{dt.__class__}: {dt.ratio}")
+        for dt in detectors:
+            logger.log(TRACE, f"{dt.__class__}: {dt.ratio}")
 
     return round(mean_mess_ratio, 3)

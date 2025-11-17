@@ -7,7 +7,7 @@ from re import sub
 from typing import Any, Iterator, List, Tuple
 
 from .constant import RE_POSSIBLE_ENCODING_INDICATION, TOO_BIG_SEQUENCE
-from .utils import iana_name, is_multi_byte_encoding, unicode_range
+from .utils import iana_name, is_multi_byte_encoding, get_thread_local_copies
 
 
 class CharsetMatch:
@@ -142,7 +142,7 @@ class CharsetMatch:
 
             languages = (
                 mb_encoding_languages(self.encoding)
-                if is_multi_byte_encoding(self.encoding)
+                if get_thread_local_copies().is_multi_byte_encoding(self.encoding)
                 else encoding_languages(self.encoding)
             )
 
@@ -191,7 +191,7 @@ class CharsetMatch:
         if self._unicode_ranges is not None:
             return self._unicode_ranges
         # list detected ranges
-        detected_ranges: list[str | None] = [unicode_range(char) for char in str(self)]
+        detected_ranges: list[str | None] = [get_thread_local_copies().unicode_range(char) for char in str(self)]
         # filter and sort
         self._unicode_ranges = sorted(list({r for r in detected_ranges if r}))
         return self._unicode_ranges

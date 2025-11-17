@@ -21,6 +21,7 @@ from .utils import (
     is_cp_similar,
     is_multi_byte_encoding,
     should_strip_sig_or_bom,
+    get_thread_local_copies,
 )
 
 logger = logging.getLogger("charset_normalizer")
@@ -176,7 +177,6 @@ def from_bytes(
 
     if "utf_8" not in prioritized_encodings:
         prioritized_encodings.append("utf_8")
-
     for encoding_iana in prioritized_encodings + IANA_SUPPORTED:
         if cp_isolation and encoding_iana not in cp_isolation:
             continue
@@ -211,7 +211,9 @@ def from_bytes(
             continue
 
         try:
-            is_multi_byte_decoder: bool = is_multi_byte_encoding(encoding_iana)
+            is_multi_byte_decoder: bool = get_thread_local_copies().is_multi_byte_encoding(
+                encoding_iana
+            )
         except (ModuleNotFoundError, ImportError):
             logger.log(
                 TRACE,
