@@ -358,7 +358,7 @@ UNICODE_RANGES_COMBINED: dict[str, range] = {
 }
 
 
-UNICODE_SECONDARY_RANGE_KEYWORD: list[str] = [
+UNICODE_SECONDARY_RANGE_KEYWORD: frozenset[str] = frozenset([
     "Supplement",
     "Extended",
     "Extensions",
@@ -374,7 +374,7 @@ UNICODE_SECONDARY_RANGE_KEYWORD: list[str] = [
     "Shapes",
     "Supplemental",
     "Tags",
-]
+])
 
 RE_POSSIBLE_ENCODING_INDICATION = re_compile(
     r"(?:(?:encoding)|(?:charset)|(?:coding))(?:[\:= ]{1,10})(?:[\"\']?)([a-zA-Z0-9\-_]+)(?:[\"\']?)",

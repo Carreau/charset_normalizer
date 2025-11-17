@@ -182,7 +182,7 @@ def characters_popularity_compare(
         raise ValueError(f"{language} not available")
 
     character_approved_count: int = 0
-    FREQUENCIES_language_set: frozenset = FREQ_SET[language]
+    FREQUENCIES_language_set: frozenset = FREQ_SET[language] #type:ignore
 
     ordered_characters_count: int = len(ordered_characters)
     target_language_characters_count: int = len(FREQUENCIES[language])

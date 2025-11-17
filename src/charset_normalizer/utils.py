@@ -8,7 +8,7 @@ import unicodedata
 from codecs import IncrementalDecoder
 from encodings.aliases import aliases
 from functools import lru_cache as _lru_cache
-from typing import TypeVar, Any, Callable
+from typing import TypeVar, Any, Callable, cast
 from types import SimpleNamespace
 
 
@@ -98,14 +98,14 @@ def __lru_cache(**kwargs: Any) -> Callable[[T], T]:
 #    return _inner
 
 
-def _false(*args, **kwargs):
+def _false(*args:Any, **kwargs:Any) -> None:
     assert False
 
 
 _meths = {}
 class LocalProxy(threading.local):
-    def lru_cache(self, **kw):
-        def _inner(meth):
+    def lru_cache(self, **kw:Any) -> Callable[[T], T]:
+        def _inner(meth:Any) -> Any:
             _meths[meth.__name__] = (kw, meth)
             self.update()
             return _false
@@ -118,7 +118,7 @@ class LocalProxy(threading.local):
     def __init__(self, /, **kwargs: dict[str, Any]) -> None:  # type: ignore
         self.update()
 
-    def update(self):
+    def update(self) -> None:
 
         # create a single entry, otherwise you get threadlocal overhead lookup for each method access
 
@@ -137,8 +137,8 @@ class LocalProxy(threading.local):
 lru_cache = LocalProxy().lru_cache
 
 
-def get_thread_local_copies():
-    return per_thread.utils
+def get_thread_local_copies() -> SimpleNamespace:
+    return cast(SimpleNamespace , per_thread.utils)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
