@@ -136,12 +136,6 @@ class LocalProxy(threading.local):
 
 lru_cache = LocalProxy().lru_cache
 
-if is_freethreaded:
-    def get_thread_local_copies() -> SimpleNamespace:
-        return cast(SimpleNamespace , per_thread.utils)
-else:
-    def get_thread_local_copies() -> SimpleNamespace:
-        return SimpleNamespace(_meths)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
@@ -537,3 +531,18 @@ def cut_sequence_chunks(
 
 
 per_thread = LocalProxy()
+def _ft_get_thread_local_copies() -> SimpleNamespace:
+    return cast(SimpleNamespace , per_thread.utils)
+
+ns = SimpleNamespace(
+                    {
+                        k: _lru_cache(**v)(m)  # type:ignore
+                        for k, (v, m) in _meths.items()
+                    }
+                )
+def _no_ft_get_thread_local_copies() -> SimpleNamespace:
+     return ns
+if is_freethreaded:
+    get_thread_local_copies = _ft_get_thread_local_copies
+else:
+    get_thread_local_copies = _no_ft_get_thread_local_copies
