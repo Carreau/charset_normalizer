@@ -136,9 +136,12 @@ class LocalProxy(threading.local):
 
 lru_cache = LocalProxy().lru_cache
 
-
-def get_thread_local_copies() -> SimpleNamespace:
-    return cast(SimpleNamespace , per_thread.utils)
+if is_freethreaded:
+    def get_thread_local_copies() -> SimpleNamespace:
+        return cast(SimpleNamespace , per_thread.utils)
+else:
+    def get_thread_local_copies() -> SimpleNamespace:
+        return SimpleNamespace(_meths)
 
 
 @lru_cache(maxsize=UTF8_MAXIMAL_ALLOCATION)
